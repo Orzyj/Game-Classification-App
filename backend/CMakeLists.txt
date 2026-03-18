@@ -12,12 +12,15 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 
 # Definicja pliku wykonywalnego
-add_executable(
-    my_backend 
-    main.cpp
-    Server.cpp)
+add_executable(my_backend 
+    src/main.cpp
+    src/Server.cpp)
 
-# Zmiana: używamy wersji _static zamiast _shared, dodano też bsoncxx_static
+target_include_directories(my_backend PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include 
+    ${CMAKE_CURRENT_SOURCE_DIR}/models
+)
+
 target_link_libraries(my_backend PRIVATE 
     mongo::mongocxx_static 
     mongo::bsoncxx_static

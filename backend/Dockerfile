@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists
 
 WORKDIR /app
 
+RUN mkdir -p /app/uploads
+
 # Skopiowanie skompilowanej binarki z etapu 1 
 # (Zakładam, że w CMakeLists.txt Twoja apka nazywa się my_backend)
 COPY --from=builder /app/build/my_backend /app/my_backend

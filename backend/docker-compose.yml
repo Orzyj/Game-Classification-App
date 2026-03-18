@@ -20,6 +20,8 @@ services:
     depends_on:
       - mongodb
     restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
 
 volumes:
   mongo_data:
