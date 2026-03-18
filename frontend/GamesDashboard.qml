@@ -20,11 +20,6 @@ Rectangle {
         onAccepted: root.fileUrl = selectedFile
     }
 
-    Timer {
-        interval: 500; running: true; repeat: true
-        onTriggered: time.text = Date().toString()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 15
@@ -107,6 +102,14 @@ Rectangle {
                 }
 
                 TextField {
+                    id: filterTitle
+                    placeholderText: "Tytuł gry"
+                    Layout.fillWidth: true
+                    background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
+                    onAccepted: fetchGames()
+                }
+
+                TextField {
                     id: filterTheme
                     placeholderText: "Motyw (np. Dark Fantasy)"
                     Layout.fillWidth: true
@@ -144,6 +147,7 @@ Rectangle {
                     onClicked: {
                         filterGenre.text = ""
                         filterTheme.text = ""
+                        filterTitle.text = ""
                         limitCombo.currentIndex = 1
                         fetchGames()
                     }
@@ -352,6 +356,59 @@ Rectangle {
                             Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: themeTxt.width + 24; height: 28; Text { id: themeTxt; text: "🎨 " + game.theme; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
                             Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: engTxt.width + 24; height: 28; Text { id: engTxt; text: "⚙️ " + game.engine; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
                             Rectangle { color: "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: diffTxt.width + 24; height: 28; Text { id: diffTxt; text: "🔥 " + game.difficulty; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true } }
+
+                            Rectangle {
+                                color: mouseAreaUp.containsMouse ? "#e2e3e5" : "#f8d7da"
+                                border.color: "#f5c2c7";
+                                border.width: 1;
+                                radius: 15;
+                                width: diffTxt.width + 24;
+                                height: 28;
+
+                                Text {
+                                    id: ratingUp;
+                                    text: "👍 " + game.rating_up;
+                                    anchors.centerIn: parent;
+                                    font.pixelSize: 13;
+                                    color: "#842029";
+                                    font.bold: true
+                                }
+
+                                MouseArea {
+                                    id: mouseAreaUp
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: sendRating(game.title, "up")
+                                }
+                            }
+
+                            Rectangle {
+                                color: mouseAreaDown.containsMouse ? "#e2e3e5" : "#f8d7da"
+                                border.color: "#f5c2c7";
+                                border.width: 1;
+                                radius: 15;
+                                width: diffTxt.width + 24;
+                                height: 28;
+
+                                Text {
+                                    id: ratingDown;
+                                    text: "👎 " + game.rating_down;
+                                    anchors.centerIn: parent;
+                                    font.pixelSize: 13;
+                                    color: "#842029";
+                                    font.bold: true
+                                }
+
+                                MouseArea {
+                                    id: mouseAreaDown
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: sendRating(game.title, "down")
+                                }
+                            }
+
                         }
 
                         Rectangle { Layout.fillWidth: true; height: 2; color: "#e9ecef"; Layout.topMargin: 5; Layout.bottomMargin: 5 }
@@ -490,12 +547,12 @@ Rectangle {
         var url = "http://localhost:8080/api/games?";
         var params = [];
 
-        if (filterGenre.text !== "") {
+        if (filterGenre.text !== "")
             params.push("genre=" + encodeURIComponent(filterGenre.text.trim()));
-        }
-        if (filterTheme.text !== "") {
+        if (filterTheme.text !== "")
             params.push("theme=" + encodeURIComponent(filterTheme.text.trim()));
-        }
+        if(filterTitle.text !== "")
+            params.push("title="+ encodeURIComponent(filterTitle.text.trim()));
 
         var currentLimit = limitCombo.currentValue;
         if (currentLimit) {
@@ -523,7 +580,9 @@ Rectangle {
                                     difficulty: game.classification ? game.classification.difficulty : "Brak",
                                     engine: game.technical_stats ? game.technical_stats.engine : "Brak",
                                     comments: game.comments ? game.comments : [],
-                                    image_url: game.image_url ? ("http://localhost:8080" + game.image_url + "?t=" + Date.now()) : ""
+                                    image_url: game.image_url ? ("http://localhost:8080" + game.image_url + "?t=" + Date.now()) : "",
+                                    rating_up: game.rating_up !== undefined ? game.rating_up : 0,
+                                    rating_down: game.rating_down !== undefined ? game.rating_down : 0
                                 };
                             });
 
@@ -640,4 +699,27 @@ Rectangle {
         };
         xhr.send();
     }
+
+    function sendRating(gameTitle, voteType) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "http://localhost:8080/api/games/" + encodeURIComponent(gameTitle) + "/rating");
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.setRequestHeader("Authorization", root.authToken);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        fetchGames();
+                    } else {
+                        console.warn("Błąd głosowania:", xhr.responseText);
+                    }
+                }
+            };
+
+            var payload = {
+                "email": root.loggedUserEmail,
+                "vote": voteType
+            };
+            xhr.send(JSON.stringify(payload));
+        }
 }
