@@ -1,5 +1,8 @@
 #include "Server.hpp"
 #include "Game.hpp"
+#include "Developer.hpp"
+#include "AuditLog.hpp"
+#include "Ticket.hpp"
 
 #include <chrono>
 #include <iomanip>
@@ -14,7 +17,27 @@
 
 using bsoncxx::builder::basic::kvp;
 using bsoncxx::builder::basic::make_document;
-//using bsoncxx::builder::basic::stream;
+
+std::string Server::url_decode(const std::string& encoded) {
+    std::string decoded;
+    decoded.reserve(encoded.length()); 
+    for (size_t i = 0; i < encoded.length(); ++i) {
+        if (encoded[i] == '+') {
+            decoded += ' ';
+        } else if (encoded[i] == '%' && i + 2 < encoded.length()) {
+            std::string hexStr = encoded.substr(i + 1, 2);
+            try {
+                decoded += static_cast<char>(std::stoi(hexStr, nullptr, 16));
+                i += 2; 
+            } catch (...) {
+                decoded += '%';
+            }
+        } else {
+            decoded += encoded[i];
+        }
+    }
+    return decoded;
+}
 
 Server::Server() {
     m_mongo_uri_env = std::getenv("MONGO_URI");
@@ -27,11 +50,83 @@ void Server::start() {
     setup_games_routes();
     setup_user_routes();
     setup_files_routes();
+    setup_rating_routes();
+    setup_developers_routes();
+    setup_logs_routes();
+    setup_platforms_routes();
+    setup_reports_routes();
 
     m_svr.set_mount_point("/uploads", "./uploads");
 
     std::cout << "Serwer startuje na porcie 8080..." << std::endl;
     m_svr.listen("0.0.0.0", 8080);
+}
+
+void Server::setup_rating_routes(){
+    m_svr.Post("/api/games/:title/rating",[this](const httplib::Request& req, httplib::Response& res){
+        if(!req.has_header("Authorization")) {
+            res.status = 401;
+            res.set_content(R"({"error": "Brak dostępu. Zaloguj się!"})", "application/json");
+            return; 
+        }
+
+        std::string title = req.path_params.at("title");
+        nlohmann::json response;
+
+        try {
+            auto json_req = nlohmann::json::parse(req.body);
+            std::string email = json_req.value("email", "");
+            std::string vote = json_req.value("vote", "");
+
+            if (email.empty() || (vote != "up" && vote != "down")) {
+                res.status = 400;
+                res.set_content(R"({"error": "Brak emaila lub nieprawidłowy głos (wymagane 'up' lub 'down')."})", "application/json");
+                return;
+            }
+
+            auto db = m_client["game_db"];
+            auto collection = db["games"];
+
+            auto filter = make_document(
+                kvp("title", title),
+                kvp("rated_emails", make_document(kvp("$ne", email)))
+            );
+
+            std::string field_to_inc = (vote == "up") ? "rating_up" : "rating_down";
+
+            auto update = make_document(
+                kvp("$inc", make_document(kvp(field_to_inc, 1))),        // $inc zwiększa wartość o 1
+                kvp("$push", make_document(kvp("rated_emails", email)))  // $push dodaje element na koniec tablicy
+            );
+
+            auto result = collection.update_one(filter.view(), update.view());
+            if (result && result->modified_count() > 0) {
+                res.status = 200;
+                response["status"] = "ok";
+                response["message"] = "Twój głos został pomyślnie dodany!";
+            } else {
+                auto game_exists = collection.count_documents(make_document(kvp("title", title)));
+                if (game_exists > 0) {
+                    res.status = 403; // 403 Forbidden
+                    response["error"] = "Już oddałeś głos na tę grę!";
+                } else {
+                    res.status = 404; // 404 Not Found
+                    response["error"] = "Nie znaleziono takiej gry.";
+                }
+            }
+
+        } catch (const nlohmann::json::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błędny format JSON";
+            response["details"] = e.what();
+            res.status = 400;
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500;
+        }
+    });
 }
 
 void Server::setup_status_routes() {
@@ -64,10 +159,10 @@ void Server::setup_games_routes() {
 
     m_svr.Delete("/api/games/:title",[this](const httplib::Request& req, httplib::Response& res){
         if(!req.has_header("Authorization")) {
-                res.status = 401;
-                res.set_content(R"({"error": "Brak dostępu. Zaloguj się!"})", "application/json");
-                return; 
-            }
+            res.status = 401;
+            res.set_content(R"({"error": "Brak dostępu. Zaloguj się!"})", "application/json");
+            return; 
+        }
 
         std::string title = req.path_params.at("title");
         nlohmann::json response;
@@ -246,7 +341,8 @@ m_svr.Delete("/api/games/:title/comments/:index",[this](const httplib::Request& 
                 for(const auto& v : values) {
                     if(req.has_param(v)) {
                         std::string value = req.get_param_value(v);
-                        std::string k = key + "."+v;
+                        url_decode(value);
+                        std::string k = (key == v) ? v : (key + "." + v);
                         filter_builder.append(kvp(k, value));
                     }
                 }
@@ -389,6 +485,9 @@ void Server::setup_user_routes() {
             users.insert_one(bsoncxx::from_json(j.dump()));
             res.status = 201;
             res.set_content(R"({"message": "User registered successfully"})", "application/json");
+        
+            log_activity(new_user.email, "USER_REGISTER", "Utworzono nowe konto w systemie");
+            
         } catch (const std::exception& e) { 
             std::cout << "KRYTYCZNY BŁĄD W REJESTRACJI: " << e.what() << std::endl;
             nlohmann::json err_res;
@@ -419,9 +518,11 @@ void Server::setup_user_routes() {
                 response["user"] = j["email"].get<std::string>();
 
                 res.set_content(response.dump(), "application/json");
+                log_activity(j["email"].get<std::string>(), "USER_LOGIN", "Pomyślne logowanie użytkownika");
             } else {
                 res.status = 401;
                 res.set_content(R"({"error": "Błędne dane logowania"})", "application/json");
+                log_activity(j["email"].get<std::string>(), "FAILED_LOGIN", "Próba logowania z błędnym hasłem");
             }
         } catch (const std::exception& e) { 
             res.status = 400; 
@@ -581,6 +682,257 @@ void Server::setup_files_routes() {
             response["error"] = "Błąd bazy danych: " + std::string(e.what());
         }
         
+        res.set_content(response.dump(), "application/json");
+    });
+}
+
+void Server::setup_developers_routes() {
+    // POST /api/developers - Dodawanie nowego studia
+    m_svr.Post("/api/developers", [this](const httplib::Request& req, httplib::Response& res) {
+        if(!req.has_header("Authorization")) {
+            res.status = 401;
+            res.set_content(R"({"error": "Brak dostępu. Zaloguj się!"})", "application/json");
+            return; 
+        }
+
+        nlohmann::json response;
+        try {
+            auto j = nlohmann::json::parse(req.body);
+
+            auto db = m_client["game_db"];
+            auto collection = db["developers"];
+            auto doc = bsoncxx::from_json(j.dump());
+            auto result = collection.insert_one(doc.view());
+
+            if (result) {
+                response["status"] = "success";
+                response["message"] = "Deweloper dodany pomyślnie";
+                response["inserted_id"] = result->inserted_id().get_oid().value.to_string();
+                res.status = 201; 
+            }
+
+        } catch (const nlohmann::json::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błędny format JSON";
+            response["details"] = e.what();
+            res.status = 400;
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500;
+        }
+
+        res.set_content(response.dump(), "application/json");
+    });
+
+    // GET /api/developers - Pobieranie listy deweloperów
+    m_svr.Get("/api/developers", [this](const httplib::Request& req, httplib::Response& res) {
+        nlohmann::json response;
+        try {
+            auto db = m_client["game_db"];
+            auto collection = db["developers"];
+            auto cursor = collection.find({});
+            nlohmann::json dev_list = nlohmann::json::array();
+
+            for(auto&& doc : cursor) {
+                dev_list.push_back(nlohmann::json::parse(bsoncxx::to_json(doc)));
+            }
+
+            response["status"] = "ok";
+            response["count"] = dev_list.size();
+            response["developers"] = dev_list;
+            res.status = 200;
+
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500;
+        }
+
+        res.set_content(response.dump(), "application/json");
+    });
+}
+void Server::log_activity(const std::string& email, const std::string& action, const std::string& details) {
+    try {
+        auto db = m_client["game_db"];
+        auto collection = db["audit_logs"]; // Nasza 5. KOLEKCJA!
+
+        // Pobranie aktualnego czasu
+        auto now = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X");
+
+        auto doc = make_document(
+            kvp("timestamp", ss.str()),
+            kvp("email", email),
+            kvp("action", action),
+            kvp("details", details)
+        );
+        collection.insert_one(doc.view());
+    } catch (...) {
+        std::cout << "Błąd zapisu logu w tle." << std::endl;
+    }
+}
+
+// --- ENDPOINT DO ODCZYTU LOGÓW
+void Server::setup_logs_routes() {
+    m_svr.Get("/api/logs", [this](const httplib::Request& req, httplib::Response& res) {
+        nlohmann::json response;
+        try {
+            auto db = m_client["game_db"];
+            auto collection = db["audit_logs"];
+            
+            mongocxx::options::find opts{};
+            opts.sort(make_document(kvp("timestamp", -1)));
+            opts.limit(50); 
+
+            auto cursor = collection.find({}, opts);
+            nlohmann::json logs_list = nlohmann::json::array();
+
+            for(auto&& doc : cursor) {
+                logs_list.push_back(nlohmann::json::parse(bsoncxx::to_json(doc)));
+            }
+
+            response["status"] = "ok";
+            response["count"] = logs_list.size();
+            response["logs"] = logs_list;
+            res.status = 200;
+
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera przy odczycie logów";
+            res.status = 500;
+        }
+
+        res.set_content(response.dump(), "application/json");
+    });
+}
+void Server::setup_platforms_routes() {
+    // POST /api/platforms - Dodawanie nowej platformy
+    m_svr.Post("/api/platforms", [this](const httplib::Request& req, httplib::Response& res) {
+        nlohmann::json response;
+        try {
+            auto j = nlohmann::json::parse(req.body);
+
+            auto db = m_client["game_db"];
+            auto collection = db["platforms"]; // 6. Kolekcja w MongoDB!
+            auto doc = bsoncxx::from_json(j.dump());
+            auto result = collection.insert_one(doc.view());
+
+            if (result) {
+                response["status"] = "success";
+                response["message"] = "Platforma dodana pomyślnie";
+                response["inserted_id"] = result->inserted_id().get_oid().value.to_string();
+                res.status = 201; 
+            }
+
+        } catch (const nlohmann::json::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błędny format JSON";
+            response["details"] = e.what();
+            res.status = 400;
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500;
+        }
+
+        res.set_content(response.dump(), "application/json");
+    });
+
+    // GET /api/platforms - Pobieranie listy platform
+    m_svr.Get("/api/platforms", [this](const httplib::Request& req, httplib::Response& res) {
+        nlohmann::json response;
+        try {
+            auto db = m_client["game_db"];
+            auto collection = db["platforms"];
+            auto cursor = collection.find({});
+            nlohmann::json plat_list = nlohmann::json::array();
+
+            for(auto&& doc : cursor) {
+                plat_list.push_back(nlohmann::json::parse(bsoncxx::to_json(doc)));
+            }
+
+            response["status"] = "ok";
+            response["count"] = plat_list.size();
+            response["platforms"] = plat_list;
+            res.status = 200;
+
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500;
+        }
+
+        res.set_content(response.dump(), "application/json");
+    });
+}
+
+void Server::setup_reports_routes() {
+    m_svr.Post("/api/reports", [this](const httplib::Request& req, httplib::Response& res){
+        if(!req.has_header("Authorization")) {
+            res.status = 401;
+            res.set_content(R"({"error": "Musisz być zalogowany, aby wysłać zgłoszenie."})", "application/json");
+            return; 
+        }
+
+        nlohmann::json response;
+
+        try {
+            auto j = nlohmann::json::parse(req.body);
+            Ticket ticket = j.get<Ticket>(); 
+            auto now = std::chrono::system_clock::now();
+            auto in_time_t = std::chrono::system_clock::to_time_t(now);
+            std::stringstream ss;
+            ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+            ticket.timestamp = ss.str();
+
+            auto db = m_client["game_db"];
+            nlohmann::json final_j = ticket; 
+            auto doc = bsoncxx::from_json(final_j.dump());
+            
+            auto result = db["reports"].insert_one(doc.view());
+
+            if (result) {
+                res.status = 201;
+                res.set_content(R"({"status": "success", "message": "Zgłoszenie dodane"})", "application/json");
+                log_activity(ticket.email_user, "REPORT_SUBMITTED", "Użytkownik wysłał zgłoszenie");
+            }
+        } catch (const std::exception& e) {
+            res.status = 400;
+            res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+        }
+        res.set_content(response.dump(), "application/json");
+    }); 
+
+    m_svr.Get("/api/reports", [this](const httplib::Request& req, httplib::Response& res){
+        nlohmann::json response;
+
+        try {
+            auto db = m_client["game_db"];
+            auto cursor =  db["reports"].find({});
+            nlohmann::json reports_list = nlohmann::json::array();
+
+            for(auto&& doc : cursor) {
+                reports_list.push_back(nlohmann::json::parse(bsoncxx::to_json(doc)));
+            }
+
+            res.status = 200;
+            response["status"] = "ok";
+            response["count"] = reports_list.size();
+            response["reports"] = reports_list;
+
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera/bazy danych";
+            response["details"] = e.what();
+            res.status = 500; 
+        }
         res.set_content(response.dump(), "application/json");
     });
 }
