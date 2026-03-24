@@ -34,7 +34,7 @@ struct Game {
     Classification classification;
     TechnicalStats technical_stats;
     std::vector<Comment> comments;
-    std::vector<User> rating_users;
+    std::vector<std::string> rated_emails;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(Game, title, developer, release_year, classification, technical_stats)
 };
