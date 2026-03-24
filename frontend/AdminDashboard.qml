@@ -12,6 +12,7 @@ Rectangle {
     // Modele danych
     property var gamesList: []
     property var usersList: []
+    property var logsList: [] // NOWE: Lista logów aktywności
 
     // Zmienna pomocnicza do zapamiętania, którą grę akurat edytujemy
     property string editingGameTitle: ""
@@ -51,6 +52,7 @@ Rectangle {
                     onClicked: {
                         fetchGames()
                         fetchUsers()
+                        fetchLogs() // Odświeżanie logów
                     }
                 }
 
@@ -103,16 +105,52 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
+            TabButton { // NOWA ZAKŁADKA
+                text: "📜 Logi Aktywności"
+                font.bold: true
+                background: Rectangle {
+                    color: adminTabs.currentIndex === 2 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: adminTabs.currentIndex === 2 ? "#dc3545" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            TabButton { // NOWA ZAKŁADKA
+                text: "📜 Tickety"
+                font.bold: true
+                background: Rectangle {
+                    color: adminTabs.currentIndex === 3 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: adminTabs.currentIndex === 3 ? "#dc3545" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
         }
 
         // Komunikat o stanie
         Label {
             id: statusLabel
-            text: adminTabs.currentIndex === 0 ? (root.gamesList.length === 0 ? "Brak gier w bazie." : "") : (root.usersList.length === 0 ? "Brak użytkowników." : "")
+            text: adminTabs.currentIndex === 0 ? (root.gamesList.length === 0 ? "Brak gier w bazie." : "") :
+                  adminTabs.currentIndex === 1 ? (root.usersList.length === 0 ? "Brak użytkowników." : "") :
+                  (root.logsList.length === 0 ? "Brak logów aktywności." : "")
             color: "#6c757d"
             font.italic: true
             font.bold: true
-            visible: (adminTabs.currentIndex === 0 && root.gamesList.length === 0) || (adminTabs.currentIndex === 1 && root.usersList.length === 0)
+            visible: (adminTabs.currentIndex === 0 && root.gamesList.length === 0) ||
+                     (adminTabs.currentIndex === 1 && root.usersList.length === 0) ||
+                     (adminTabs.currentIndex === 2 && root.logsList.length === 0)
             Layout.alignment: Qt.AlignHCenter
         }
 
@@ -286,6 +324,109 @@ Rectangle {
                 }
             }
         }
+
+        // ==========================================
+        // WIDOK 3: LOGI AKTYWNOŚCI (NOWY)
+        // ==========================================
+        ListView {
+            id: logsListView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            spacing: 10
+            model: root.logsList
+
+            visible: adminTabs.currentIndex === 2
+
+            delegate: Rectangle {
+                width: logsListView.width
+                height: logLayout.implicitHeight + 20
+                color: "white"
+                radius: 8
+                border.color: "#ced4da"
+                border.width: 1
+
+                required property var modelData
+                property var logEntry: modelData
+
+                ColumnLayout {
+                    id: logLayout
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 5
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: "🕒 " + logEntry.timestamp
+                            font.pixelSize: 12
+                            color: "#6c757d"
+                            font.bold: true
+                        }
+                        Item { Layout.fillWidth: true } // Wypełniacz robiący odstęp
+
+                        // Tag akcji (np. USER_LOGIN)
+                        Rectangle {
+                            color: "#e9ecef"
+                            radius: 4
+                            width: actionLabel.width + 10
+                            height: actionLabel.height + 6
+                            Label {
+                                id: actionLabel
+                                text: logEntry.action
+                                anchors.centerIn: parent
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: "#495057"
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "👤 Użytkownik: " + logEntry.email
+                        font.pixelSize: 14
+                        font.bold: true
+                        color: "#212529"
+                        Layout.fillWidth: true
+                    }
+
+                    Label {
+                        text: "📝 Szczegóły: " + logEntry.details
+                        font.pixelSize: 14
+                        color: "#343a40"
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+        }
+
+        ListView { // [TO DO]
+            id: ticketListView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            spacing: 10
+            model: root.logsList
+
+            visible: adminTabs.currentIndex === 3
+
+            delegate: Rectangle {
+                width: ticketListView.width
+                height: ticketLayout.implicitHeight + 20
+                color: "#fff3cd"
+                radius: 8
+                border.color: "#ffe69c"
+                border.width: 1
+
+                ColumnLayout {
+                    id: ticketLayout
+                    anchors.fill: parent
+                    anchors.margins: 10
+
+                }
+            }
+        }
     }
 
     // ==========================================
@@ -348,7 +489,9 @@ Rectangle {
     Component.onCompleted: {
         fetchGames()
         fetchUsers()
+        fetchLogs() // Inicjalne pobranie logów po wejściu w widok
     }
+
 
     // ==========================================
     // FUNKCJE API: GRY I KOMENTARZE
@@ -442,7 +585,7 @@ Rectangle {
     }
 
     // ==========================================
-    // FUNKCJE API: UŻYTKOWNICY
+    // FUNKCJE API: UŻYTKOWNICY I LOGI
     // ==========================================
 
     function fetchUsers() {
@@ -471,6 +614,24 @@ Rectangle {
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && (xhr.status === 200 || xhr.status === 204)) {
                 fetchUsers();
+            }
+        }
+        xhr.send();
+    }
+
+    function fetchLogs() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "http://localhost:8080/api/logs");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var jsonResponse = JSON.parse(xhr.responseText);
+                    if (jsonResponse.status === "ok" && jsonResponse.logs) {
+                        root.logsList = jsonResponse.logs;
+                    }
+                } catch(e) { console.error("Błąd parsowania logów:", e); }
             }
         }
         xhr.send();

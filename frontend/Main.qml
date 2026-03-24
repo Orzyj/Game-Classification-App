@@ -3,11 +3,11 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 ApplicationWindow {
+    id: window
     visible: true
-    width: 600
-    height: 500
     title: "Aplikacja z Grami"
     color: "#f0f2f5"
+    visibility: Window.Maximized
 
     // Zmienne przechowujące nasz token i dane użytkownika po zalogowaniu
     property string authToken: ""
