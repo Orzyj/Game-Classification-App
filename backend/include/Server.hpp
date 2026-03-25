@@ -13,6 +13,7 @@
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
 #include <mongocxx/uri.hpp>
+#include <mutex>
 
 #include <bsoncxx/json.hpp>
 
@@ -25,6 +26,7 @@ private:
     std::string m_mongo_uri;
     mongocxx::client m_client;
     httplib::Server m_svr;
+    std::mutex m_db_mutex;
 
     // key , values
     const std::map<std::string, std::vector<std::string>> FILTER_KEYS {
@@ -48,9 +50,9 @@ private:
     void setup_logs_routes();
     void setup_platforms_routes();
     void setup_reports_routes();
-    
-    void log_activity(const std::string& email, const std::string& action, const std::string& details);
+    void setup_premiere_routes();
 
+    void log_activity(const std::string& email, const std::string& action, const std::string& details);
 
 public:
     Server();
