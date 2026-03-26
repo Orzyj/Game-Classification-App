@@ -12,7 +12,8 @@ Rectangle {
     property string loggedUserEmail: ""
     property var gamesList: []
     property var developersList: []
-    property var platformsList: [] // <-- NOWE: Lista platform
+    property var platformsList: []
+    property var premieresList: []
     property string gameTitle: ""
     property string fileUrl: ""
     property bool isImageLoaded: false
@@ -88,15 +89,17 @@ Rectangle {
                                 ComboBox {
                                     id: inputDev
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
                                     model: ["Wybierz dewelopera..."]
                                     background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
                                 }
 
-                                // <-- NOWE: Wybór platformy przy dodawaniu gry
                                 ComboBox {
                                     id: inputPlatform
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
                                     model: ["Wybierz platformę..."]
+
                                     background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
                                 }
 
@@ -118,6 +121,7 @@ Rectangle {
                                     model: ["Easy", "Medium", "Hard", "Very Hard", "Nightmare"]
                                     currentIndex: 1
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
                                     background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
                                 }
                             }
@@ -214,28 +218,12 @@ Rectangle {
                             }
 
                             Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6"; Layout.topMargin: 10; Layout.bottomMargin: 10 }
-                            Label { text: "Lista zapisanych deweloperów (Słownik):"; font.bold: true; color: "#495057" }
-
-                            Flow {
-                                Layout.fillWidth: true; spacing: 10
-                                Repeater {
-                                    model: root.developersList
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        property var dev: modelData
-
-                                        color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: devTxt.width + 24; height: 28
-                                        Text { id: devTxt; text: "🏢 " + dev.name + " (" + dev.country + ")"; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true }
-                                    }
-                                }
-                            }
-                            Button { text: "Odśwież listę studiów"; flat: true; onClicked: fetchDevelopers() }
                         }
                     }
                 }
 
                 // ==========================================
-                // NOWE: SEKCJA ZARZĄDZANIA PLATFORMAMI
+                // SEKCJA ZARZĄDZANIA PLATFORMAMI
                 // ==========================================
                 Rectangle {
                     id: addPlatformContainer
@@ -286,22 +274,6 @@ Rectangle {
                             }
 
                             Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6"; Layout.topMargin: 10; Layout.bottomMargin: 10 }
-                            Label { text: "Lista zapisanych platform (Słownik):"; font.bold: true; color: "#495057" }
-
-                            Flow {
-                                Layout.fillWidth: true; spacing: 10
-                                Repeater {
-                                    model: root.platformsList
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        property var plat: modelData
-
-                                        color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: platTxt.width + 24; height: 28
-                                        Text { id: platTxt; text: "🕹️ " + plat.name + " (" + plat.manufacturer + ")"; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true }
-                                    }
-                                }
-                            }
-                            Button { text: "Odśwież listę platform"; flat: true; onClicked: fetchPlatforms() }
                         }
                     }
                 }
@@ -319,7 +291,6 @@ Rectangle {
         // ==========================================
         // PASEK NAWIGACJI
         // ==========================================
-
         Rectangle {
             Layout.fillWidth: true
             height: 80
@@ -341,13 +312,21 @@ Rectangle {
                 }
 
                 Button {
-                    text: "Odśwież wszystko" // Zmieniono na odświeżanie wszystkiego
+                    text: "Odśwież wszystko"
                     flat: true
                     onClicked: {
                         fetchGames()
                         fetchDevelopers()
                         fetchPlatforms()
+                        fetchPremieres()
                     }
+                }
+
+                Button {
+                    text: "🚨 Zgłoś problem"
+                    background: Rectangle { color: "#ffc107"; radius: 5 }
+                    contentItem: Text { text: parent.text; color: "#212529"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked: reportPopup.open()
                 }
 
                 Button {
@@ -367,168 +346,442 @@ Rectangle {
         }
 
         // ==========================================
-        // SEKCJA FILTROWANIA + LIMIT
+        // TAB BAR (ZAKŁADKI)
         // ==========================================
-        Rectangle {
+        TabBar {
+            id: mainTabs
             Layout.fillWidth: true
-            height: filterLayout.implicitHeight + 40
-            color: "white"
-            radius: 8
-            border.color: "#cdd1d5"
-            border.width: 1
+            background: Rectangle { color: "transparent" }
 
-            RowLayout {
-                id: filterLayout
-                anchors.fill: parent
-                anchors.margins: 15
-                spacing: 15
-
-                Label { text: "Filtruj:"; font.bold: true; color: "#495057" }
-
-                TextField { id: filterGenre; placeholderText: "Gatunek (np. RPG)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
-                TextField { id: filterTitle; placeholderText: "Tytuł gry"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
-                TextField { id: filterTheme; placeholderText: "Motyw (np. Dark Fantasy)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
-
-                Label { text: "Pokaż:"; font.bold: true; color: "#495057"; Layout.leftMargin: 10 }
-
-                ComboBox {
-                    id: limitCombo
-                    model: [5, 10, 20, 30, 40, 50, 100]
-                    currentIndex: 1
-                    Layout.preferredWidth: 80
-                    background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
-                    onActivated: fetchGames()
+            TabButton {
+                text: "🎮 Lista Gier"
+                font.bold: true
+                background: Rectangle {
+                    color: mainTabs.currentIndex === 0 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
                 }
-
-                Button { text: "Szukaj"; background: Rectangle { color: "#0d6efd"; radius: 5 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: fetchGames() }
-
-                Button {
-                    text: "Wyczyść"
-                    background: Rectangle { color: "transparent"; border.color: "#6c757d"; radius: 5 }
-                    contentItem: Text { text: parent.text; color: "#6c757d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    onClicked: {
-                        filterGenre.text = ""
-                        filterTheme.text = ""
-                        filterTitle.text = ""
-                        limitCombo.currentIndex = 1
-                        fetchGames()
-                    }
+                contentItem: Text {
+                    text: parent.text
+                    color: mainTabs.currentIndex === 0 ? "#0d6efd" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            TabButton {
+                text: "🏢 Platformy i Studia"
+                font.bold: true
+                background: Rectangle {
+                    color: mainTabs.currentIndex === 1 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: mainTabs.currentIndex === 1 ? "#0d6efd" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            TabButton {
+                text: "📅 Zapowiedzi i Premiery"
+                font.bold: true
+                background: Rectangle {
+                    color: mainTabs.currentIndex === 2 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: mainTabs.currentIndex === 2 ? "#0d6efd" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }
 
-        Button {
-            text: "☰ Otwórz menu i filtry"
-            font.bold: true
-            font.pixelSize: 16
-            background: Rectangle { color: "#0d6efd"; radius: 5 }
-            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            onClicked: toolsDrawer.open()
-        }
-
-
-
-        Label {
-            id: statusLabel
-            text: "Pobieranie gier..."
-            color: "#6c757d"
-            font.italic: true
-            font.bold: true
-            visible: root.gamesList.length === 0
-            Layout.alignment: Qt.AlignHCenter
-        }
-
         // ==========================================
-        // FEED GIER
+        // ZAKŁADKA 1: GRY (FILTROWANIE + LISTA)
         // ==========================================
-        ListView {
-            id: listView
+        ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
-            spacing: 25
-            model: root.gamesList
+            spacing: 15
+            visible: mainTabs.currentIndex === 0
 
-            onContentYChanged: {
-                if (contentY > 50) {
-                    if (addGameContainer.isExpanded) addGameContainer.isExpanded = false;
-                    if (addDevContainer.isExpanded) addDevContainer.isExpanded = false;
-                    if (addPlatformContainer.isExpanded) addPlatformContainer.isExpanded = false; // <-- Zamykanie platform
+            Rectangle {
+                Layout.fillWidth: true
+                height: filterLayout.implicitHeight + 40
+                color: "white"
+                radius: 8
+                border.color: "#cdd1d5"
+                border.width: 1
+
+                RowLayout {
+                    id: filterLayout
+                    anchors.fill: parent
+                    anchors.margins: 15
+                    spacing: 15
+
+                    Label { text: "Filtruj:"; font.bold: true; color: "#495057" }
+
+                    TextField { id: filterGenre; placeholderText: "Gatunek (np. RPG)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
+                    TextField { id: filterTitle; placeholderText: "Tytuł gry"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
+                    TextField { id: filterTheme; placeholderText: "Motyw (np. Dark Fantasy)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } onAccepted: fetchGames() }
+
+                    Label { text: "Pokaż:"; font.bold: true; color: "#495057"; Layout.leftMargin: 10 }
+
+                    ComboBox {
+                        id: limitCombo
+                        model: [5, 10, 20, 30, 40, 50, 100]
+                        currentIndex: 1
+                        Layout.preferredWidth: 80
+                        Layout.preferredHeight: 40
+                        background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
+                        onActivated: fetchGames()
+                    }
+
+                    Button { text: "Szukaj"; background: Rectangle { color: "#0d6efd"; radius: 5 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: fetchGames() }
+
+                    Button {
+                        text: "Wyczyść"
+                        background: Rectangle { color: "transparent"; border.color: "#6c757d"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "#6c757d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: {
+                            filterGenre.text = ""
+                            filterTheme.text = ""
+                            filterTitle.text = ""
+                            limitCombo.currentIndex = 1
+                            fetchGames()
+                        }
+                    }
                 }
             }
 
-            delegate: Rectangle {
-                width: listView.width
-                height: Math.max(250, postRow.implicitHeight + 30)
-                color: "white"; radius: 12; border.color: "#cdd1d5"; border.width: 1
+            Button {
+                text: "☰ Otwórz menu dodawania gier/słowników"
+                font.bold: true
+                font.pixelSize: 16
+                background: Rectangle { color: "#0d6efd"; radius: 5 }
+                contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                onClicked: toolsDrawer.open()
+            }
 
-                required property var modelData
-                property var game: modelData
+            Label {
+                id: statusLabel
+                text: "Pobieranie gier..."
+                color: "#6c757d"
+                font.italic: true
+                font.bold: true
+                visible: root.gamesList.length === 0
+                Layout.alignment: Qt.AlignHCenter
+            }
 
-                RowLayout {
-                    id: postRow
-                    anchors.fill: parent; anchors.margins: 15; spacing: 20
+            ListView {
+                id: listView
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 25
+                model: root.gamesList
 
-                    Image {
-                        Layout.preferredWidth: 220; Layout.preferredHeight: 300
-                        source: game.image_url; fillMode: Image.PreserveAspectCrop; visible: game.image_url !== ""; clip: true
-                        Rectangle {
-                            anchors.fill: parent; color: "#f8f9fa"; visible: parent.status === Image.Loading
-                            Label { text: "Ładowanie obrazka..."; anchors.centerIn: parent; color: "#6c757d" }
-                        }
+                onContentYChanged: {
+                    if (contentY > 50) {
+                        if (addGameContainer.isExpanded) addGameContainer.isExpanded = false;
+                        if (addDevContainer.isExpanded) addDevContainer.isExpanded = false;
+                        if (addPlatformContainer.isExpanded) addPlatformContainer.isExpanded = false;
                     }
+                }
 
-                    ColumnLayout {
-                        id: rightColumn
-                        Layout.fillWidth: true; Layout.fillHeight: true; Layout.alignment: Qt.AlignTop; spacing: 10
+                delegate: Rectangle {
+                    width: listView.width
+                    height: Math.max(250, postRow.implicitHeight + 30)
+                    color: "white"; radius: 12; border.color: "#cdd1d5"; border.width: 1
+
+                    required property var modelData
+                    property var game: modelData
+
+                    RowLayout {
+                        id: postRow
+                        anchors.fill: parent; anchors.margins: 15; spacing: 20
+
+                        Image {
+                            Layout.preferredWidth: 220; Layout.preferredHeight: 300
+                            source: game.image_url; fillMode: Image.PreserveAspectCrop; visible: game.image_url !== ""; clip: true
+                            Rectangle {
+                                anchors.fill: parent; color: "#f8f9fa"; visible: parent.status === Image.Loading
+                                Label { text: "Ładowanie obrazka..."; anchors.centerIn: parent; color: "#6c757d" }
+                            }
+                        }
 
                         ColumnLayout {
-                            spacing: 5; Layout.fillWidth: true
-                            Label { text: game.title; font.bold: true; font.pixelSize: 24; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                            // <-- Możesz opcjonalnie wyświetlić tu platformę, dodałem ją jeśli backend ją zapisze
-                            Label { text: game.developer + " • " + game.release_year + (game.platform !== undefined && game.platform !== "" ? " • " + game.platform : ""); font.pixelSize: 15; color: "#6c757d"; font.bold: true }
+                            id: rightColumn
+                            Layout.fillWidth: true; Layout.fillHeight: true; Layout.alignment: Qt.AlignTop; spacing: 10
+
+                            ColumnLayout {
+                                spacing: 5; Layout.fillWidth: true
+                                Label { text: game.title; font.bold: true; font.pixelSize: 24; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                                Label { text: game.developer + " • " + game.release_year + (game.platform !== undefined && game.platform !== "" ? " • " + game.platform : ""); font.pixelSize: 15; color: "#6c757d"; font.bold: true }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true; spacing: 10
+                                Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: genreTxt.width + 24; height: 28; Text { id: genreTxt; text: "🎭 " + game.genre; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
+                                Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: themeTxt.width + 24; height: 28; Text { id: themeTxt; text: "🎨 " + game.theme; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
+                                Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: engTxt.width + 24; height: 28; Text { id: engTxt; text: "⚙️ " + game.engine; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
+                                Rectangle { color: "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: diffTxt.width + 24; height: 28; Text { id: diffTxt; text: "🔥 " + game.difficulty; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true } }
+
+                                Rectangle {
+                                    color: mouseAreaUp.containsMouse ? "#e2e3e5" : "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: ratingUp.width + 24; height: 28
+                                    Text { id: ratingUp; text: "👍 " + game.rating_up; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true }
+                                    MouseArea { id: mouseAreaUp; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sendRating(game.title, "up") }
+                                }
+                                Rectangle {
+                                    color: mouseAreaDown.containsMouse ? "#e2e3e5" : "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: ratingDown.width + 24; height: 28
+                                    Text { id: ratingDown; text: "👎 " + game.rating_down; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true }
+                                    MouseArea { id: mouseAreaDown; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sendRating(game.title, "down") }
+                                }
+                            }
+
+                            Rectangle { Layout.fillWidth: true; height: 2; color: "#e9ecef"; Layout.topMargin: 5; Layout.bottomMargin: 5 }
+
+                            Label { text: "Komentarze (" + game.comments.length + ")"; font.bold: true; font.pixelSize: 16; color: "#495057" }
+
+                            Repeater {
+                                model: game.comments
+                                delegate: ColumnLayout {
+                                    spacing: 4; Layout.fillWidth: true; Layout.bottomMargin: 10
+                                    required property var modelData; property var comment: modelData
+                                    Label { text: comment.author_name + " • " + comment.date; font.bold: true; font.pixelSize: 13; color: "#212529" }
+                                    Rectangle {
+                                        Layout.fillWidth: true; height: commentText.implicitHeight + 20; color: "#f8f9fa"; border.color: "#dee2e6"; border.width: 1; radius: 8
+                                        Label { id: commentText; text: comment.content; anchors.fill: parent; anchors.margins: 10; wrapMode: Text.Wrap; font.pixelSize: 14; color: "#343a40" }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true; Layout.topMargin: 5
+                                TextField { id: commentInput; placeholderText: "Napisz komentarz..."; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 20 } leftPadding: 15 }
+                                Button { text: "Wyślij"; background: Rectangle { color: "#0d6efd"; radius: 20 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: { if(commentInput.text !== "") { sendComment(game.title, commentInput.text, commentInput); } } }
+                            }
                         }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // ZAKŁADKA 2: PLATFORMY I DEWELOPERZY
+        // ==========================================
+        GridLayout {
+            columns: 2
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            columnSpacing: 20
+            visible: mainTabs.currentIndex === 1
+
+            // Lewa kolumna: Deweloperzy
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: "white"
+                radius: 8
+                border.color: "#cdd1d5"
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 15
+
+                    Label { text: "💼 Zapisani Deweloperzy"; font.bold: true; font.pixelSize: 18; color: "#212529" }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6" }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
 
                         Flow {
-                            Layout.fillWidth: true; spacing: 10
-                            Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: genreTxt.width + 24; height: 28; Text { id: genreTxt; text: "🎭 " + game.genre; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
-                            Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: themeTxt.width + 24; height: 28; Text { id: themeTxt; text: "🎨 " + game.theme; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
-                            Rectangle { color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: engTxt.width + 24; height: 28; Text { id: engTxt; text: "⚙️ " + game.engine; anchors.centerIn: parent; font.pixelSize: 13; color: "#495057"; font.bold: true } }
-                            Rectangle { color: "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: diffTxt.width + 24; height: 28; Text { id: diffTxt; text: "🔥 " + game.difficulty; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true } }
+                            width: parent.width; spacing: 10
+                            Repeater {
+                                model: root.developersList
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    property var dev: modelData
+                                    color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: devLayout.implicitWidth + 24; height: 28
 
-                            Rectangle {
-                                color: mouseAreaUp.containsMouse ? "#e2e3e5" : "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: ratingUp.width + 24; height: 28
-                                Text { id: ratingUp; text: "👍 " + game.rating_up; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true }
-                                MouseArea { id: mouseAreaUp; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sendRating(game.title, "up") }
-                            }
-                            Rectangle {
-                                color: mouseAreaDown.containsMouse ? "#e2e3e5" : "#f8d7da"; border.color: "#f5c2c7"; border.width: 1; radius: 15; width: ratingDown.width + 24; height: 28
-                                Text { id: ratingDown; text: "👎 " + game.rating_down; anchors.centerIn: parent; font.pixelSize: 13; color: "#842029"; font.bold: true }
-                                MouseArea { id: mouseAreaDown; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sendRating(game.title, "down") }
+                                    RowLayout {
+                                        id: devLayout
+                                        anchors.centerIn: parent
+                                        spacing: 5
+                                        Text { text: "🏢 " + dev.name + " (" + dev.country + ")"; font.pixelSize: 13; color: "#495057"; font.bold: true }
+                                        Rectangle {
+                                            width: 16; height: 16; radius: 8; color: "#dc3545"
+                                            Text { text: "✖"; color: "white"; font.pixelSize: 10; font.bold: true; anchors.centerIn: parent }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: deleteDeveloper(dev.name) }
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
+                    Button { text: "Odśwież deweloperów"; Layout.alignment: Qt.AlignHCenter; onClicked: fetchDevelopers() }
+                }
+            }
 
-                        Rectangle { Layout.fillWidth: true; height: 2; color: "#e9ecef"; Layout.topMargin: 5; Layout.bottomMargin: 5 }
+            // Prawa kolumna: Platformy
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: "white"
+                radius: 8
+                border.color: "#cdd1d5"
+                border.width: 1
 
-                        Label { text: "Komentarze (" + game.comments.length + ")"; font.bold: true; font.pixelSize: 16; color: "#495057" }
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 15
 
-                        Repeater {
-                            model: game.comments
-                            delegate: ColumnLayout {
-                                spacing: 4; Layout.fillWidth: true; Layout.bottomMargin: 10
-                                required property var modelData; property var comment: modelData
-                                Label { text: comment.author_name + " • " + comment.date; font.bold: true; font.pixelSize: 13; color: "#212529" }
-                                Rectangle {
-                                    Layout.fillWidth: true; height: commentText.implicitHeight + 20; color: "#f8f9fa"; border.color: "#dee2e6"; border.width: 1; radius: 8
-                                    Label { id: commentText; text: comment.content; anchors.fill: parent; anchors.margins: 10; wrapMode: Text.Wrap; font.pixelSize: 14; color: "#343a40" }
+                    Label { text: "🎮 Zapisane Platformy"; font.bold: true; font.pixelSize: 18; color: "#212529" }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6" }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+
+                        Flow {
+                            width: parent.width; spacing: 10
+                            Repeater {
+                                model: root.platformsList
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    property var plat: modelData
+                                    color: "#e9ecef"; border.color: "#ced4da"; border.width: 1; radius: 15; width: platLayout.implicitWidth + 24; height: 28
+
+                                    RowLayout {
+                                        id: platLayout
+                                        anchors.centerIn: parent
+                                        spacing: 5
+                                        Text { text: "🕹️ " + plat.name + " (" + plat.manufacturer + ")"; font.pixelSize: 13; color: "#495057"; font.bold: true }
+                                        Rectangle {
+                                            width: 16; height: 16; radius: 8; color: "#dc3545"
+                                            Text { text: "✖"; color: "white"; font.pixelSize: 10; font.bold: true; anchors.centerIn: parent }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: deletePlatform(plat.name) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Button { text: "Odśwież platformy"; Layout.alignment: Qt.AlignHCenter; onClicked: fetchPlatforms() }
+                }
+            }
+        }
+
+        // ==========================================
+        // ZAKŁADKA 3: PREMIERY GIER
+        // ==========================================
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 15
+            visible: mainTabs.currentIndex === 2 // Pokazuje się tylko dla trzeciej zakładki
+
+            Label {
+                text: "Brak zaplanowanych premier."
+                color: "#6c757d"
+                font.italic: true
+                font.bold: true
+                visible: root.premieresList.length === 0
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 20
+            }
+
+            ListView {
+                id: premieresListView
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 15
+                model: root.premieresList
+
+                delegate: Rectangle {
+                    width: premieresListView.width
+                    height: premiereLayout.implicitHeight + 30
+                    color: "white"
+                    radius: 8
+                    border.color: "#cdd1d5"
+                    border.width: 1
+
+                    required property var modelData
+                    property var premiere: modelData
+
+                    ColumnLayout {
+                        id: premiereLayout
+                        anchors.fill: parent
+                        anchors.margins: 15
+                        spacing: 8
+
+                        RowLayout {
+                            Layout.fillWidth: true
+
+                            Label {
+                                text: premiere.title + " (" + premiere.platform + ")"
+                                font.pixelSize: 18
+                                font.bold: true
+                                color: "#212529"
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Rectangle {
+                                color: "#ffc107"
+                                radius: 4
+                                width: exclLabel.width + 12
+                                height: exclLabel.height + 6
+                                visible: premiere.is_exclusive === true
+
+                                Label {
+                                    id: exclLabel
+                                    text: "👑 Exclusive"
+                                    anchors.centerIn: parent
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: "#212529"
                                 }
                             }
                         }
 
+                        Label {
+                            text: "🏢 Deweloper: " + premiere.developer
+                            font.pixelSize: 14
+                            color: "#495057"
+                        }
+
                         RowLayout {
-                            Layout.fillWidth: true; Layout.topMargin: 5
-                            TextField { id: commentInput; placeholderText: "Napisz komentarz..."; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 20 } leftPadding: 15 }
-                            Button { text: "Wyślij"; background: Rectangle { color: "#0d6efd"; radius: 20 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: { if(commentInput.text !== "") { sendComment(game.title, commentInput.text, commentInput); } } }
+                            Layout.fillWidth: true
+                            spacing: 25
+
+                            Label {
+                                text: "📅 Data premiery: " + premiere.release_date
+                                font.pixelSize: 14
+                                font.bold: true
+                                color: "#0d6efd"
+                            }
+
+                            Label {
+                                text: "🔥 Hype Score: " + premiere.hype_score + "/100"
+                                font.pixelSize: 14
+                                font.bold: true
+                                color: "#dc3545"
+                            }
                         }
                     }
                 }
@@ -554,10 +807,141 @@ Rectangle {
         }
     }
 
+    // ==========================================
+    // NOWE: POP-UP ZGŁOSZEŃ (TICKETÓW)
+    // ==========================================
+    Popup {
+        id: reportPopup
+        width: 450; height: 350; anchors.centerIn: parent; modal: true; focus: true; closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        Rectangle {
+            anchors.fill: parent; color: "white"; radius: 10; border.color: "#ffc107"; border.width: 2
+            ColumnLayout {
+                anchors.fill: parent; anchors.margins: 20; spacing: 15
+                Label { text: "Napisz zgłoszenie (Ticket)"; font.bold: true; font.pixelSize: 18; color: "#212529"; Layout.fillWidth: true }
+                Label { text: "Opisz swój problem lub sugestię. Zgłoszenie trafi do administracji."; color: "#495057"; Layout.fillWidth: true; wrapMode: Text.Wrap }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    TextArea {
+                        id: reportInput
+                        placeholderText: "Wpisz treść tutaj..."
+                        wrapMode: Text.Wrap
+                        background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 5 }
+                    }
+                }
+
+                Label { id: reportStatus; text: ""; color: "#dc3545"; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight; spacing: 15
+                    Button {
+                        text: "Anuluj";
+                        background: Rectangle { color: "#e2e6ea"; radius: 5 }
+                        onClicked: { reportPopup.close(); reportInput.text = ""; reportStatus.text = ""; }
+                    }
+                    Button {
+                        text: "Wyślij zgłoszenie";
+                        background: Rectangle { color: "#0d6efd"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: sendReport()
+                    }
+                }
+            }
+        }
+    }
+
     Component.onCompleted: {
         fetchGames();
         fetchDevelopers();
-        fetchPlatforms(); // <-- Automatyczne pobieranie na starcie
+        fetchPlatforms();
+        fetchPremieres();
+    }
+
+    // --- FUNKCJE DLA PREMIER ---
+    function fetchPremieres() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "http://localhost:8080/api/premiers");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var jsonResponse = JSON.parse(xhr.responseText);
+                    if (jsonResponse.status === "ok" && jsonResponse.premiers) {
+                        root.premieresList = jsonResponse.premiers;
+                    }
+                } catch(e) { console.error("Błąd parsowania list premier:", e); }
+            }
+        }
+        xhr.send();
+    }
+
+    function deleteDeveloper(devName) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("DELETE", "http://localhost:8080/api/developers/" + encodeURIComponent(devName));
+            xhr.setRequestHeader("Authorization", root.authToken);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200 || xhr.status === 204) {
+                        fetchDevelopers();
+                    } else {
+                        console.error("Błąd usuwania dewelopera: " + xhr.responseText);
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function deletePlatform(platName) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("DELETE", "http://localhost:8080/api/platforms/" + encodeURIComponent(platName));
+            xhr.setRequestHeader("Authorization", root.authToken);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200 || xhr.status === 204) {
+                        fetchPlatforms();
+                    } else {
+                        console.error("Błąd usuwania platformy: " + xhr.responseText);
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+    function sendReport() {
+        if (reportInput.text.trim() === "") {
+            reportStatus.text = "Treść zgłoszenia nie może być pusta.";
+            reportStatus.color = "#dc3545";
+            return;
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "http://localhost:8080/api/reports");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 201 || xhr.status === 200) {
+                    reportPopup.close();
+                    reportInput.text = "";
+                    reportStatus.text = "";
+                } else {
+                    reportStatus.text = "Wystąpił błąd: " + xhr.responseText;
+                    reportStatus.color = "#dc3545";
+                }
+            }
+        };
+
+        var payload = {
+            "email_user": root.loggedUserEmail,
+            "message": reportInput.text.trim()
+        };
+
+        xhr.send(JSON.stringify(payload));
     }
 
     // ==========================================
@@ -574,7 +958,7 @@ Rectangle {
         if (filterTheme.text !== "") params.push("theme=" + encodeURIComponent(filterTheme.text.trim()));
         if (filterTitle.text !== "") params.push("title="+ encodeURIComponent(filterTitle.text.trim()));
 
-        var currentLimit = limitCombo.currentValue;
+        var currentLimit = limitCombo.currentText;
         if (currentLimit) params.push("limit=" + currentLimit);
         url += params.join("&");
 
@@ -646,6 +1030,7 @@ Rectangle {
                     inputTitle.text = ""; inputDev.currentIndex = 0; inputPlatform.currentIndex = 0;
                     inputYear.text = ""; inputGenre.text = ""; inputSubgenre.text = ""; inputTheme.text = "";
                     inputEngine.text = ""; inputPlaytime.text = ""; inputDifficulty.currentIndex = 1;
+                    fetchGames();
                 } else {
                     addStatusLabel.text = "Błąd: " + xhr.responseText;
                     addStatusLabel.color = "#dc3545";
@@ -671,7 +1056,6 @@ Rectangle {
             "comments": []
         };
         xhr.send(JSON.stringify(payload));
-        fetchGames();
     }
 
     function sendComment(gameTitle, content, inputFieldReference) {

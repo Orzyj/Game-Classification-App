@@ -12,7 +12,9 @@ Rectangle {
     // Modele danych
     property var gamesList: []
     property var usersList: []
-    property var logsList: [] // NOWE: Lista logów aktywności
+    property var logsList: []
+    property var reportsList: []
+    property var premieresList: []
 
     // Zmienna pomocnicza do zapamiętania, którą grę akurat edytujemy
     property string editingGameTitle: ""
@@ -46,13 +48,26 @@ Rectangle {
                 }
 
                 Button {
+                    text: "➕ Dodaj Premierę"
+                    background: Rectangle { color: "#28a745"; radius: 5 } // Zielony przycisk akcji
+                    contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    onClicked:
+                    {
+                        addPremierePopup.open();
+                        fetchPremieres();
+                    }
+                }
+
+                Button {
                     text: "Odśwież Dane"
                     background: Rectangle { color: "transparent"; border.color: "white"; border.width: 1; radius: 5 }
                     contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     onClicked: {
                         fetchGames()
                         fetchUsers()
-                        fetchLogs() // Odświeżanie logów
+                        fetchLogs()
+                        fetchReports()
+                        fetchPremieres()
                     }
                 }
 
@@ -105,7 +120,7 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
-            TabButton { // NOWA ZAKŁADKA
+            TabButton {
                 text: "📜 Logi Aktywności"
                 font.bold: true
                 background: Rectangle {
@@ -121,8 +136,8 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
-            TabButton { // NOWA ZAKŁADKA
-                text: "📜 Tickety"
+            TabButton {
+                text: "📝 Tickety"
                 font.bold: true
                 background: Rectangle {
                     color: adminTabs.currentIndex === 3 ? "white" : "#e9ecef"
@@ -137,6 +152,22 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
+            TabButton {
+                text: "📅 Premiery"
+                font.bold: true
+                background: Rectangle {
+                    color: adminTabs.currentIndex === 4 ? "white" : "#e9ecef"
+                    border.color: "#dee2e6"
+                    radius: 5
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: adminTabs.currentIndex === 4 ? "#dc3545" : "#495057"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
         }
 
         // Komunikat o stanie
@@ -144,13 +175,17 @@ Rectangle {
             id: statusLabel
             text: adminTabs.currentIndex === 0 ? (root.gamesList.length === 0 ? "Brak gier w bazie." : "") :
                   adminTabs.currentIndex === 1 ? (root.usersList.length === 0 ? "Brak użytkowników." : "") :
-                  (root.logsList.length === 0 ? "Brak logów aktywności." : "")
+                  adminTabs.currentIndex === 2 ? (root.logsList.length === 0 ? "Brak logów aktywności." : "") :
+                  adminTabs.currentIndex === 3 ? (root.reportsList.length === 0 ? "Brak zgłoszonych ticketów." : "") :
+                  (root.premieresList.length === 0 ? "Brak zaplanowanych premier." : "") // <--- NOWE
             color: "#6c757d"
             font.italic: true
             font.bold: true
             visible: (adminTabs.currentIndex === 0 && root.gamesList.length === 0) ||
                      (adminTabs.currentIndex === 1 && root.usersList.length === 0) ||
-                     (adminTabs.currentIndex === 2 && root.logsList.length === 0)
+                     (adminTabs.currentIndex === 2 && root.logsList.length === 0) ||
+                     (adminTabs.currentIndex === 3 && root.reportsList.length === 0) ||
+                     (adminTabs.currentIndex === 4 && root.premieresList.length === 0) // <--- NOWE
             Layout.alignment: Qt.AlignHCenter
         }
 
@@ -326,7 +361,7 @@ Rectangle {
         }
 
         // ==========================================
-        // WIDOK 3: LOGI AKTYWNOŚCI (NOWY)
+        // WIDOK 3: LOGI AKTYWNOŚCI
         // ==========================================
         ListView {
             id: logsListView
@@ -401,29 +436,227 @@ Rectangle {
             }
         }
 
-        ListView { // [TO DO]
+        // ==========================================
+        // WIDOK 4: TICKETY (RAPORTY)
+        // ==========================================
+        ListView {
             id: ticketListView
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
             spacing: 10
-            model: root.logsList
+            model: root.reportsList
 
             visible: adminTabs.currentIndex === 3
 
             delegate: Rectangle {
                 width: ticketListView.width
                 height: ticketLayout.implicitHeight + 20
-                color: "#fff3cd"
+                color: "#fff3cd" // Żółtawe tło dla zgłoszeń
                 radius: 8
                 border.color: "#ffe69c"
                 border.width: 1
+
+                required property var modelData
+                property var ticketEntry: modelData
 
                 ColumnLayout {
                     id: ticketLayout
                     anchors.fill: parent
                     anchors.margins: 10
+                    spacing: 5
 
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: "🕒 " + (ticketEntry.timestamp ? ticketEntry.timestamp : "Brak daty")
+                            font.pixelSize: 12
+                            color: "#856404"
+                            font.bold: true
+                        }
+                        Item { Layout.fillWidth: true }
+
+                        // Przycisk Zakończ - gotowy do podpięcia endpointu usuwania/zamykania ticketu
+                        Button {
+                            text: "✓ Zakończ"
+                            background: Rectangle { color: "transparent"; radius: 4; border.color: "#856404" }
+                            contentItem: Text { text: parent.text; color: "#856404"; font.bold: true; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: {
+                                if (ticketEntry._id && ticketEntry._id["$oid"]) {
+                                    closeTicket(ticketEntry._id["$oid"]);
+                                } else {
+                                    console.error("Brak poprawnego ID dla tego zgłoszenia.");
+                                }
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "👤 Zgłaszający: " + (ticketEntry.email_user ? ticketEntry.email_user : "Nieznany")
+                        font.pixelSize: 14
+                        font.bold: true
+                        color: "#212529"
+                        Layout.fillWidth: true
+                    }
+
+                    Label {
+                        // Uwaga: Zmień ticketEntry.message na nazwę pola z backendu (np. ticketEntry.content), jeśli jest inna.
+                        text: "📝 Treść: " + (ticketEntry.message ? ticketEntry.message : (ticketEntry.content ? ticketEntry.content : "Brak treści zgłoszenia."))
+                        font.pixelSize: 14
+                        color: "#343a40"
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // WIDOK 5: PREMIERY GIER
+        // ==========================================
+        ListView {
+            id: premieresListView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            spacing: 15
+            model: root.premieresList
+
+            visible: adminTabs.currentIndex === 4
+
+            delegate: Rectangle {
+                width: premieresListView.width
+                height: premiereLayout.implicitHeight + 20
+                color: "#f8f9fa"
+                radius: 8
+                border.color: "#ced4da"
+                border.width: 1
+
+                required property var modelData
+                property var premiere: modelData
+
+                ColumnLayout {
+                    id: premiereLayout
+                    anchors.fill: parent
+                    anchors.margins: 15
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Label {
+                            text: premiere.title + " (" + premiere.platform + ")"
+                            font.pixelSize: 18
+                            font.bold: true
+                            color: "#212529"
+                        }
+
+                        Item { Layout.fillWidth: true } // Wypełniacz
+
+                        // Etykieta Exclusive (wyświetla się tylko jeśli true)
+                        Rectangle {
+                            color: "#ffc107" // Złoty/żółty
+                            radius: 4
+                            width: exclLabel.width + 12
+                            height: exclLabel.height + 6
+                            visible: premiere.is_exclusive === true
+
+                            Label {
+                                id: exclLabel
+                                text: "👑 Exclusive"
+                                anchors.centerIn: parent
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: "#212529"
+                            }
+                        }
+                    }
+
+                    Label {
+                        text: "🏢 Deweloper: " + premiere.developer
+                        font.pixelSize: 14
+                        color: "#495057"
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 25
+
+                        Label {
+                            text: "📅 Data premiery: " + premiere.release_date
+                            font.pixelSize: 14
+                            font.bold: true
+                            color: "#0d6efd" // Niebieski akcent dla daty
+                        }
+
+                        Label {
+                            text: "🔥 Hype Score: " + premiere.hype_score + "/100"
+                            font.pixelSize: 14
+                            font.bold: true
+                            color: "#dc3545" // Czerwony akcent dla hype
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // POP-UP DO DODAWANIA PREMIERY
+    // ==========================================
+    Popup {
+        id: addPremierePopup
+        width: 450
+        height: addPremiereLayout.implicitHeight + 50
+        anchors.centerIn: parent
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        Rectangle {
+            anchors.fill: parent
+            color: "white"
+            radius: 12
+            border.color: "#ced4da"
+            border.width: 1
+
+            ColumnLayout {
+                id: addPremiereLayout
+                anchors.fill: parent
+                anchors.margins: 25
+                spacing: 15
+
+                Label { text: "Dodaj Nową Premierę"; font.bold: true; font.pixelSize: 20; color: "#212529" }
+
+                Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6"; Layout.bottomMargin: 10 }
+
+                TextField { id: premTitle; placeholderText: "Tytuł gry"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: premDev; placeholderText: "Deweloper"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: premPlatform; placeholderText: "Platforma (np. PC, PS5)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: premDate; placeholderText: "Data premiery (YYYY-MM-DD)"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: premHype; placeholderText: "Hype Score (0-100)"; validator: IntValidator {bottom: 0; top: 100} Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+
+                CheckBox { id: premExclusive; text: "Gra ekskluzywna (Exclusive)" }
+
+                Label { id: premStatus; text: ""; color: "#dc3545"; font.bold: true }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight
+                    Layout.topMargin: 10
+                    spacing: 15
+
+                    Button {
+                        text: "Anuluj"
+                        background: Rectangle { color: "#e9ecef"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "#495057"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: addPremierePopup.close()
+                    }
+                    Button {
+                        text: "Dodaj"
+                        background: Rectangle { color: "#28a745"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: submitPremiere()
+                    }
                 }
             }
         }
@@ -489,13 +722,82 @@ Rectangle {
     Component.onCompleted: {
         fetchGames()
         fetchUsers()
-        fetchLogs() // Inicjalne pobranie logów po wejściu w widok
+        fetchLogs()
+        fetchReports()
+        fetchPremieres()
     }
 
+    function fetchPremieres() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "http://localhost:8080/api/premiers");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var jsonResponse = JSON.parse(xhr.responseText);
+                    if (jsonResponse.status === "ok" && jsonResponse.premiers) {
+                        root.premieresList = jsonResponse.premiers;
+                    }
+                } catch(e) { console.error("Błąd parsowania list premier:", e); }
+            }
+        }
+        xhr.send();
+    }
+
+    // ==========================================
+    // FUNKCJE API: PREMIERY
+    // ==========================================
+
+    function submitPremiere() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "http://localhost:8080/api/premiers");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 201) {
+                    addPremierePopup.close();
+
+                    // Wyczyszczenie formularza
+                    premTitle.text = "";
+                    premDev.text = "";
+                    premPlatform.text = "";
+                    premDate.text = "";
+                    premHype.text = "";
+                    premExclusive.checked = false;
+                    premStatus.text = "";
+                    console.log("Premiera dodana pomyślnie.");
+                    fetchPremieres();
+
+                } else {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        premStatus.text = "Błąd: " + (response.error ? response.error : xhr.responseText);
+                    } catch(e) {
+                        premStatus.text = "Wystąpił nieznany błąd.";
+                    }
+                }
+            }
+        }
+
+        var payload = {
+            "title": premTitle.text,
+            "developer": premDev.text,
+            "platform": premPlatform.text,
+            "release_date": premDate.text,
+            "hype_score": parseInt(premHype.text) || 0,
+            "is_exclusive": premExclusive.checked
+        };
+
+        xhr.send(JSON.stringify(payload));
+    }
 
     // ==========================================
     // FUNKCJE API: GRY I KOMENTARZE
     // ==========================================
+
 
     function fetchGames() {
         var xhr = new XMLHttpRequest();
@@ -636,4 +938,44 @@ Rectangle {
         }
         xhr.send();
     }
+
+    // ==========================================
+    // FUNKCJE API: TICKETY (RAPORTY)
+    // ==========================================
+
+    function fetchReports() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "http://localhost:8080/api/reports");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var jsonResponse = JSON.parse(xhr.responseText);
+                    if (jsonResponse.status === "ok" && jsonResponse.reports) {
+                        root.reportsList = jsonResponse.reports;
+                    }
+                } catch(e) { console.error("Błąd parsowania ticketów:", e); }
+            }
+        }
+        xhr.send();
+    }
+
+    function closeTicket(ticketId) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("DELETE", "http://localhost:8080/api/reports/" + encodeURIComponent(ticketId));
+            xhr.setRequestHeader("Authorization", root.authToken);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200 || xhr.status === 204) {
+                        console.log("Ticket zamknięty pomyślnie.");
+                        fetchReports(); // Odśwież listę, aby zniknął z ekranu
+                    } else {
+                        console.error("Błąd podczas zamykania ticketu:", xhr.responseText);
+                    }
+                }
+            }
+            xhr.send();
+        }
 }
