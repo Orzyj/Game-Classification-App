@@ -60,6 +60,7 @@ void Server::start() {
     setup_logs_routes();
     setup_platforms_routes();
     setup_reports_routes();
+    setup_premiere_routes();
 
     m_svr.set_mount_point("/uploads", "./uploads");
 
@@ -1084,8 +1085,13 @@ void Server::setup_reports_routes() {
 }
 
 void Server::setup_premiere_routes() {
+
     m_svr.Post("/api/premiers", [this](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(m_db_mutex);
+        if(!req.has_header("Authorization")) {
+            res.status = 401;
+            res.set_content(R"({"error": "Brak autoryzacji."})", "application/json");
+            return; 
+        }
         try {
             auto j = nlohmann::json::parse(req.body);
             auto db = m_client["game_db"];
@@ -1102,10 +1108,17 @@ void Server::setup_premiere_routes() {
 
     m_svr.Get("/api/premiers", [this](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(m_db_mutex);
+
+        if(!req.has_header("Authorization")) {
+            res.status = 401;
+            res.set_content(R"({"error": "Brak autoryzacji."})", "application/json");
+            return; 
+        }
+
         try {
             auto db = m_client["game_db"];
             mongocxx::options::find opts{};
-            opts.sort(bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("release_date", 1)));
+            opts.sort(make_document(kvp("release_date", 1)));
 
             auto cursor = db["premiers"].find({}, opts);
             nlohmann::json list = nlohmann::json::array();
