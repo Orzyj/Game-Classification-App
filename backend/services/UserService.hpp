@@ -102,6 +102,63 @@ public:
 
         return isDeleted;
     }
+
+    /**
+     * @brief Zmienia uprawnienia moderatora/administratora dla danego konta.
+     * @param email Adres email konta.
+     * @param flag true, aby nadać uprawnienia, false, aby je odebrać.
+     * @return true, jeśli konto zostało pomyślnie zmodyfikowane, false jeśli wystąpił błąd.
+     */
+    bool modUser(const std::string& email, const bool& flag) {
+        bool isModed = userRepository.modUser(email, flag);
+
+        if(isModed) {
+            std::string logMessage = flag ? "Nadano uprawnienia moderatora" : "Odebrano uprawnienia moderatora";
+            AuditLog newLog(getCurrentTimestamp(), email, "MOD_USER", logMessage);
+            auditRepository.insertLog(newLog);
+        }
+
+        return isModed;
+    }
+
+    /**
+     * @brief Zmienia status aktywności konta użytkownika (aktywacja/dezaktywacja).
+     * * Funkcja modyfikuje status konta na podstawie przekazanej flagi. 
+     * Po pomyślnej zmianie w bazie danych, operacja jest automatycznie 
+     * zapisywana w logach audytowych (AuditLog).
+     * * @param email Adres email użytkownika, którego konto ma zostać zmodyfikowane.
+     * @param flag Wartość logiczna: true, aby aktywować (odblokować) konto, false, aby je dezaktywować (zablokować).
+     * @return true, jeśli status został pomyślnie zmieniony, false jeśli wystąpił błąd (np. brak użytkownika w bazie).
+     */
+    bool changeUserAccountStatus(const std::string& email, const bool& flag) {
+        bool isChanged = userRepository.chagneUserAccountStatus(email, flag);
+
+        if(isChanged) {
+            std::string logMessage = flag ? "Aktywowano użytkownika" : "Dezaktywowano";
+            AuditLog newLog(getCurrentTimestamp(), email, "ACCOUNT_STATUS_USER", logMessage);
+            auditRepository.insertLog(newLog);
+        }
+
+        return isChanged;
+    }
+
+    /**
+     * @brief Sprawdza, czy użytkownik o podanym adresie email posiada uprawnienia moderatora.
+     * @param email Adres email użytkownika do sprawdzenia.
+     * @return true, jeśli użytkownik ma uprawnienia moderatora, false w przeciwnym razie (lub gdy użytkownik nie istnieje).
+     */
+    bool isUserMod(const std::string& email) {
+        return userRepository.isUserMod(email);
+    }
+
+    /**
+     * @brief Sprawdza, czy konto użytkownika o podanym adresie email jest aktywne.
+     * @param email Adres email użytkownika do sprawdzenia.
+     * @return true, jeśli konto jest aktywne (niezablokowane), false jeśli jest zablokowane (lub gdy użytkownik nie istnieje).
+     */
+    bool isUserEnable(const std::string& email) {
+        return userRepository.isUserEnable(email);
+    }
 };
 
 #endif // USERSERVICE_HPP

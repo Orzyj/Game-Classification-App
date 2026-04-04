@@ -183,6 +183,35 @@ public:
             res.set_content(nlohmann::json{{"error", "Błąd serwera"}}.dump(), "application/json");
         }
     }
+    // PATCH /api/games/:title/comments/:index
+    void updateComment(const httplib::Request& req, httplib::Response& res) {
+        try {
+            std::string title = url_decode(req.path_params.at("title"));
+            std::string index = req.path_params.at("index");
+            std::string userEmail = extractUserFromToken(req);
+
+            auto json_body = nlohmann::json::parse(req.body);
+            if (!json_body.contains("content")) {
+                res.status = 400; // Bad Request
+                res.set_content(R"({"error": "Brak pola 'content' w ciele zapytania"})", "application/json");
+                return;
+            }
+            std::string newContent = json_body["content"];
+            gameService.updateComment(title, index, userEmail, newContent);
+            res.status = 200;
+            res.set_content(R"({"status": "ok", "message": "Komentarz zaktualizowany pomyślnie."})", "application/json");
+
+        } catch (const nlohmann::json::exception& e) {
+            res.status = 400;
+            res.set_content(nlohmann::json{{"error", "Nieprawidłowy format JSON"}}.dump(), "application/json");
+        } catch (const std::invalid_argument& e) {
+            res.status = 404; 
+            res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+        } catch (const std::exception& e) { 
+            res.status = 500;
+            res.set_content(nlohmann::json{{"error", "Błąd serwera"}}.dump(), "application/json");
+        }
+    }
 
     // POST /api/games/:title/image
     void uploadImage(const httplib::Request& req, httplib::Response& res) {

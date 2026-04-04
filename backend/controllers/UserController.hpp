@@ -48,12 +48,16 @@ public:
             bool success = userService.loginUser(email, password);
 
             if (success) {
+                bool isUserMod = userService.isUserMod(email);
+                bool isUserEnable = userService.isUserEnable(email);
                 std::string token = "session_" + email; 
                 
                 nlohmann::json response;
                 response["status"] = "success";
                 response["token"] = token; 
                 response["user"] = email;
+                response["isMod"] = isUserMod;
+                response["isEnable"] = isUserEnable;
 
                 res.set_content(response.dump(), "application/json");
             } else {
@@ -113,6 +117,62 @@ public:
             response["message"] = "Błąd serwera";
             res.status = 500;
         }
+        res.set_content(response.dump(), "application/json");
+    }
+
+    // Odpowiada za PATCH /api/user/:email/:flag
+    void modUser(const httplib::Request& req, httplib::Response& res) {
+        std::string email = req.path_params.at("email");
+        std::string flag_str = req.path_params.at("flag");
+        bool flag = (flag_str == "true" || flag_str == "1");
+        nlohmann::json response;
+
+        try {
+            bool success = userService.modUser(email, flag);
+
+            if (success) {
+                res.status = 200; 
+                response["status"] = "ok";
+                response["message"] = flag ? "Nadano uprawnienia administratora" : "Odebrano uprawnienia administratora";
+            } else {
+                res.status = 404;
+                response["status"] = "error";
+                response["message"] = "Nie znaleziono użytkownika lub nie zmieniono stanu";
+            }
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera";
+            res.status = 500;
+        }
+        
+        res.set_content(response.dump(), "application/json");
+    }
+
+    // Odpowiada za PATCH /api/user/:email/:flag
+    void changeUserAccountStatus(const httplib::Request& req, httplib::Response& res) {
+        std::string email = req.path_params.at("email");
+        std::string flag_str = req.path_params.at("flag");
+        bool flag = (flag_str == "true" || flag_str == "1");
+        nlohmann::json response;
+
+        try {
+            bool success = userService.changeUserAccountStatus(email, flag);
+
+            if (success) {
+                res.status = 200; 
+                response["status"] = "ok";
+                response["message"] = flag ? "Aktywowano użytkownika" : "Dezaktywowano";
+            } else {
+                res.status = 404;
+                response["status"] = "error";
+                response["message"] = "Nie znaleziono użytkownika lub nie zmieniono stanu";
+            }
+        } catch (const std::exception& e) {
+            response["status"] = "error";
+            response["message"] = "Błąd serwera";
+            res.status = 500;
+        }
+        
         res.set_content(response.dump(), "application/json");
     }
 };

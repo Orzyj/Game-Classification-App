@@ -71,7 +71,7 @@ int main() {
     httplib::Server svr;
     svr.set_mount_point("/uploads", "./uploads");
 
-    // MIDDLEWARE AUTORYZACYJNY
+    //[DP] MIDDLEWARE AUTORYZACYJNY
     auto with_auth = [](auto handler) {
         return [handler](const httplib::Request& req, httplib::Response& res) {
             if (!req.has_header("Authorization")) {
@@ -117,13 +117,14 @@ int main() {
         userController.getAllUsers(req, res); 
     }));
     svr.Delete("/api/users/:email", with_auth([&](const auto& req, auto& res) { userController.deleteUser(req, res); }));
-
+    svr.Patch("/api/users/:email/:flag", with_auth([&](const auto& req, auto& res) { userController.modUser(req, res); }));
+    svr.Patch("/api/users/:email/status/:flag", with_auth([&](const auto& req, auto& res) { userController.changeUserAccountStatus(req, res); }));
+    
     // Gry
     svr.Get("/api/games", with_auth([&](const auto& req, auto& res) {
         std::lock_guard<std::mutex> lock(mutex); 
         gameController.getGames(req, res); 
     }));
-
     svr.Post("/api/addgames", with_auth([&](const auto& req, auto& res) { gameController.addGame(req, res); }));
     svr.Delete("/api/games/:title", with_auth([&](const auto& req, auto& res) { gameController.deleteGame(req, res); }));
     svr.Put("/api/games/:title", with_auth([&](const auto& req, auto& res) { gameController.updateGame(req, res); }));
@@ -131,6 +132,7 @@ int main() {
     svr.Post("/api/games/:title/comments", with_auth([&](const auto& req, auto& res) { gameController.addComment(req, res); }));
     svr.Delete("/api/games/:title/comments/:index", with_auth([&](const auto& req, auto& res) { gameController.deleteComment(req, res); }));
     svr.Post("/api/games/:title/image", with_auth([&](const auto& req, auto& res) { gameController.uploadImage(req, res); }));
+    svr.Patch("/api/games/:title/comments/:index", with_auth([&](const auto& req, auto& res) { gameController.updateComment(req, res); }));
 
     // Zgłoszenia (Reports)
     svr.Post("/api/reports", with_auth([&](const auto& req, auto& res) { reportController.submitReport(req, res); }));

@@ -9,7 +9,6 @@
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/json.hpp> // Wymagane!
 #include <iostream>
-
 using bsoncxx::builder::basic::kvp;
 using bsoncxx::builder::basic::make_document;
 
@@ -106,10 +105,16 @@ public:
         return games;
     }
 
-    bool gameExists(const std::string& title) override {
+    bool gameExists(const std::string& title, const int& year, const std::string& dev) override {
         try {
             auto collection = db["games"];
-            auto count = collection.count_documents(make_document(kvp("title", title)));
+            auto count = collection.count_documents(
+                make_document(
+                    kvp("title", title),
+                    kvp("developer", dev),
+                    kvp("release_year", year)
+                )
+            );
             return count > 0;
         } catch (...) {
             return false;
@@ -131,7 +136,7 @@ public:
             auto result = collection.update_one(filter.view(), update.view());
 
             if (result && result->modified_count() > 0) return 0;
-            if (gameExists(title)) return 2; 
+            //if (gameExists(title)) return 2; 
             return 1; 
         } catch (...) { return -1; }
     }
@@ -173,6 +178,33 @@ public:
 
             auto result = collection.update_one(filter.view(), update.view());
             return (result && result->matched_count() > 0);
+        } catch (...) { return false; }
+    }
+
+    bool updateComment(
+        const std::string& title, 
+        const std::string& commentIndex, 
+        const std::string& author,
+        const std::string& newContent) override {
+        try {
+            auto collection = db["games"];
+            std::string contentPath = "comments." + commentIndex + ".content";
+            std::string authorPath = "comments." + commentIndex + ".author_name";
+
+            auto filter = make_document(
+                kvp("title", title),
+                kvp(authorPath, author) 
+            );
+            
+            auto update = make_document(
+                kvp("$set", make_document(
+                    kvp(contentPath, newContent)
+                ))
+            );
+            
+            auto result = collection.update_one(filter.view(), update.view());
+            return (result && result->modified_count() > 0);
+
         } catch (...) { return false; }
     }
 };

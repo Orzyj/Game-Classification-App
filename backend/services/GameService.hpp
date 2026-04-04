@@ -26,7 +26,7 @@ public:
         : gameRepository(gameRepo), auditService(audit) {}
 
     void addGame(const Game& game, const std::string& userEmail) {
-        if (gameRepository.gameExists(game.title)) throw std::invalid_argument("Gra o tym tytule już istnieje.");
+        if (gameRepository.gameExists(game.title, game.release_year, game.developer)) throw std::invalid_argument("Gra o tym tytule już istnieje.");
         gameRepository.insertGame(game);
         auditService.logActivity(userEmail, "GAME_ADDED", "Dodano nową grę: " + game.title);
     }
@@ -69,6 +69,18 @@ public:
     void deleteComment(const std::string& title, const std::string& indexStr, const std::string& userEmail) {
         if (!gameRepository.deleteComment(title, indexStr)) throw std::invalid_argument("Nie znaleziono gry lub komentarza.");
         auditService.logActivity(userEmail, "COMMENT_DELETED", "Usunięto komentarz z gry: " + title);
+    }
+
+    void updateComment(
+        const std::string& title, 
+        const std::string& commentIndex, 
+        const std::string& author,
+        const std::string& newContent) {
+            if(!gameRepository.updateComment(title, commentIndex, author, newContent)) {
+                auditService.logActivity(author, "COMMENT_DELETED", "Bład podczas Update komentarza: ");
+                throw std::invalid_argument("Nie znaleziono komentarza");
+            }
+            auditService.logActivity(author, "COMMENT_DELETED", "Pomyślny Update komentarza: ");
     }
 
     void setGameImage(const std::string& title, const std::string& imageUrl, const std::string& userEmail) {

@@ -90,6 +90,83 @@ public:
             return false;
         }
     }
+
+    bool modUser(const std::string& email, const bool& flag) override {
+        try {
+            auto collection = db["users"];
+            auto filter = make_document(kvp("email", email));
+            auto update = make_document(kvp("$set", make_document(kvp("isMod", flag))));
+            auto result = collection.update_one(filter.view(), update.view());
+
+            return (result && result->modified_count() > 0) ? true : false;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "[MongoUserRepository] Błąd nadawania uprawnien: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
+    bool chagneUserAccountStatus(const std::string& email, const bool& flag) override {
+        try {
+            auto collection = db["users"];
+            auto filter = make_document(kvp("email", email));
+            auto update = make_document(kvp("$set", make_document(kvp("isEnable", flag))));
+            auto result = collection.update_one(filter.view(), update.view());
+
+            return (result && result->modified_count() > 0) ? true : false;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "[MongoUserRepository] Błąd aktualizowania konta użytkownika: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
+    bool isUserMod(const std::string& email) override {
+        try {
+            auto userCredentials = db["users"].find_one(
+                make_document(
+                    kvp("email", email)
+                )
+            );
+
+            if(userCredentials) {
+                bsoncxx::document::view view = userCredentials->view();
+                auto isModField = view["isMod"];
+
+                if(isModField && isModField.type() == bsoncxx::type::k_bool) {
+                    return isModField.get_bool().value;
+                }
+            } 
+            return false;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "[MongoUserRepository] Błąd podczas sprawdzania uprawnień konta: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
+    bool isUserEnable(const std::string& email) override {
+        try {
+            auto userCredentials = db["users"].find_one(
+                make_document(
+                    kvp("email", email)
+                )
+            );
+
+            if(userCredentials) {
+                bsoncxx::document::view view = userCredentials->view();
+                auto isEnableField = view["isEnable"];
+
+                if(isEnableField && isEnableField.type() == bsoncxx::type::k_bool) {
+                    return isEnableField.get_bool().value;
+                }
+            } 
+            return false;
+        } catch (const std::exception& e) {
+            std::cerr << "[MongoUserRepository] Błąd podczas sprawdzanai status konta: " << e.what() << std::endl;
+            return false;
+        }
+    }
 }; 
 
 #endif // MONGOUSERREPOSITORY_HPP

@@ -50,6 +50,36 @@ public:
      * @return true, jeśli użytkownik został pomyślnie usunięty, false jeśli go nie znaleziono.
      */
     virtual bool deleteUser(const std::string& email) = 0;
+
+    /**
+     * @brief Nadaje/Odbiera uprawnienia moda użytkownikowi 
+     * @param email Adres użytkownika 
+     * @param bool Nadanie/Odebranie uprawnienia
+     * @return true jeśli wszystko pójdzie dobrze, false jeśli coś pójdzie nie tak
+     */
+    virtual bool modUser(const std::string& email, const bool& flag) = 0;
+
+    /**
+     * @brief Dezaktwuje/Aktywuje konto użytkownika
+     * @param email Adres użytkownika
+     * @param bool Aktywacja/Dezaktywacja użytkownika
+     * @return true jeśli wszystko pójdzie dobrze, false jesli coś pójdzie nie tak
+     */
+    virtual bool chagneUserAccountStatus(const std::string& email, const bool& flag) = 0;
+
+    /**
+     * @brief Sprawdza czy użytkownik ma moda
+     * @param email Adres użytkownika
+     * @return true jeśli jeśli jest mod, false jeśli nie jest
+     */
+    virtual bool isUserMod(const std::string& email) = 0;
+    
+    /**
+     * @brief Sprawdza czy konto użytkownika jest wyłaczone
+     * @param email Adres użytkownika
+     * @return true jeśli jeśli jest , false jeśli nie jest
+     */
+    virtual bool isUserEnable(const std::string& email) = 0;
 };
 
 #endif // IUSERREPOSITORY_HPP
