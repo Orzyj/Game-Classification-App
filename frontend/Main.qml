@@ -193,16 +193,25 @@ ApplicationWindow {
                 }
 
                 if (xhr.status === 200) {
-                    // SUKCES! Zapisujemy token i maila do globalnych zmiennych
                     authToken = response.token;
                     loggedUserEmail = response.user;
                     labelRef.text = "";
+                    var isModFlag = (response.isMod === true);
 
-                    // Przełączamy ekran na Dashboard
                     if (response.user === "admin" || response.user === "admin@wp.com") {
                         stackView.push("AdminDashboard.qml", { "authToken": response.token, "loggedUserEmail": response.user });
                     } else {
-                        stackView.push("GamesDashboard.qml", { "authToken": response.token, "loggedUserEmail": response.user });
+                        if(response.isEnable) {
+                            stackView.push("GamesDashboard.qml",
+                                {
+                                "authToken": response.token,
+                                "loggedUserEmail": response.user,
+                                "isUserMod": isModFlag
+                            });
+                        } else {
+                            labelRef.text = "Twoje konto zostało zablokowane, skontaktuj sie z adminem";
+                            labelRef.color = "red";
+                        }
                     }
 
                 } else if (xhr.status === 0) {
@@ -260,7 +269,7 @@ ApplicationWindow {
             }
         }
 
-        var payload = {"name": name, "email": email, "password": password};
+        var payload = {"name": name, "email": email, "password": password, "isMod": false, "isEnable": true};
         xhr.send(JSON.stringify(payload));
     }
 }

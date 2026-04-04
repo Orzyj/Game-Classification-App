@@ -10,6 +10,12 @@ Rectangle {
 
     property string authToken: ""
     property string loggedUserEmail: ""
+
+    // --- ZMIENNA: Status Moderatora ---
+    property bool isUserMod: false
+
+    property string editingGameTitle: ""
+
     property var gamesList: []
     property var developersList: []
     property var platformsList: []
@@ -25,9 +31,11 @@ Rectangle {
 
     Drawer {
         id: toolsDrawer
-        width: 1800
+        width: 900
         height: root.height
         edge: Qt.LeftEdge
+        // Blokada wysunięcia palcem dla zwykłych użytkowników
+        interactive: root.isUserMod
 
         ScrollView {
             anchors.fill: parent
@@ -99,7 +107,6 @@ Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 40
                                     model: ["Wybierz platformę..."]
-
                                     background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 }
                                 }
 
@@ -304,10 +311,10 @@ Rectangle {
                 anchors.margins: 15
 
                 Label {
-                    text: "Zalogowany: " + root.loggedUserEmail
+                    text: "Zalogowany: " + (root.isUserMod ? "[MOD] " : "") + root.loggedUserEmail
                     font.bold: true
                     font.pixelSize: 16
-                    color: "#212529"
+                    color: root.isUserMod ? "#dc3545" : "#212529"
                     Layout.fillWidth: true
                 }
 
@@ -330,7 +337,7 @@ Rectangle {
                 }
 
                 Button {
-                    text: "Usuń konto"
+                    text: "Dezaktywuj konto"
                     background: Rectangle { color: "transparent"; border.color: "#dc3545"; border.width: 2; radius: 5 }
                     contentItem: Text { text: parent.text; color: "#dc3545"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     onClicked: deleteAccountPopup.open()
@@ -461,10 +468,12 @@ Rectangle {
                 }
             }
 
+            // Przycisk otwierający menu dodawania - widoczny tylko dla modów
             Button {
                 text: "☰ Otwórz menu dodawania gier/słowników"
                 font.bold: true
                 font.pixelSize: 16
+                visible: root.isUserMod
                 background: Rectangle { color: "#0d6efd"; radius: 5 }
                 contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                 onClicked: toolsDrawer.open()
@@ -521,10 +530,32 @@ Rectangle {
                             id: rightColumn
                             Layout.fillWidth: true; Layout.fillHeight: true; Layout.alignment: Qt.AlignTop; spacing: 10
 
-                            ColumnLayout {
-                                spacing: 5; Layout.fillWidth: true
-                                Label { text: game.title; font.bold: true; font.pixelSize: 24; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                                Label { text: game.developer + " • " + game.release_year + (game.platform !== undefined && game.platform !== "" ? " • " + game.platform : ""); font.pixelSize: 15; color: "#6c757d"; font.bold: true }
+                            // NAGŁÓWEK GRY I PRZYCISKI MODA
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                ColumnLayout {
+                                    spacing: 5; Layout.fillWidth: true
+                                    Label { text: game.title; font.bold: true; font.pixelSize: 24; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                                    Label { text: game.developer + " • " + game.release_year + (game.platform !== undefined && game.platform !== "" ? " • " + game.platform : ""); font.pixelSize: 15; color: "#6c757d"; font.bold: true }
+                                }
+
+                                // PRZYCISKI DO EDYCJI I USUWANIA (TYLKO DLA MODÓW)
+                                Button {
+                                    text: "✏️ Edytuj"
+                                    visible: root.isUserMod
+                                    background: Rectangle { color: "#e9ecef"; radius: 5; border.color: "#ced4da"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#495057"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                    onClicked: openEditPopup(game)
+                                }
+                                Button {
+                                    text: "🗑️ Usuń"
+                                    visible: root.isUserMod
+                                    background: Rectangle { color: "#f8d7da"; radius: 5; border.color: "#dc3545"; border.width: 1 }
+                                    contentItem: Text { text: parent.text; color: "#dc3545"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                    onClicked: deleteGame(game.title)
+                                }
                             }
 
                             Flow {
@@ -550,15 +581,82 @@ Rectangle {
 
                             Label { text: "Komentarze (" + game.comments.length + ")"; font.bold: true; font.pixelSize: 16; color: "#495057" }
 
+                            // REPEATER DO EDYCJI KOMENTARZY ORAZ WYSZARZANIA (isAuthorEnabled)
                             Repeater {
                                 model: game.comments
                                 delegate: ColumnLayout {
+                                    id: commentDelegate
                                     spacing: 4; Layout.fillWidth: true; Layout.bottomMargin: 10
-                                    required property var modelData; property var comment: modelData
-                                    Label { text: comment.author_name + " • " + comment.date; font.bold: true; font.pixelSize: 13; color: "#212529" }
+
+                                    required property var modelData
+                                    required property int index
+                                    property var comment: modelData
+
+                                    property bool isAuthorEnabled: comment.author_is_enabled !== false
+                                    property bool isEditing: false
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Label {
+                                            text: (isAuthorEnabled ? comment.author_name : comment.author_name + " (Konto Wyłączone)") + " • " + comment.date;
+                                            font.bold: true;
+                                            font.pixelSize: 13;
+                                            color: isAuthorEnabled ? "#212529" : "#adb5bd";
+                                            Layout.fillWidth: true
+                                        }
+
+                                        Button {
+                                            text: commentDelegate.isEditing ? "Anuluj" : "✏️ Edytuj"
+                                            visible: comment.author_name === root.loggedUserEmail && isAuthorEnabled
+                                            background: Rectangle { color: "transparent"; radius: 5 }
+                                            contentItem: Text { text: parent.text; color: "#0d6efd"; font.bold: true; horizontalAlignment: Text.AlignRight }
+                                            onClicked: {
+                                                commentDelegate.isEditing = !commentDelegate.isEditing;
+                                                if (commentDelegate.isEditing) {
+                                                    editCommentField.text = comment.content;
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     Rectangle {
-                                        Layout.fillWidth: true; height: commentText.implicitHeight + 20; color: "#f8f9fa"; border.color: "#dee2e6"; border.width: 1; radius: 8
-                                        Label { id: commentText; text: comment.content; anchors.fill: parent; anchors.margins: 10; wrapMode: Text.Wrap; font.pixelSize: 14; color: "#343a40" }
+                                        Layout.fillWidth: true
+                                        height: commentDelegate.isEditing ? editRow.implicitHeight + 20 : commentText.implicitHeight + 20
+                                        color: "#f8f9fa"; border.color: "#dee2e6"; border.width: 1; radius: 8
+
+                                        Label {
+                                            id: commentText
+                                            text: comment.content;
+                                            anchors.fill: parent; anchors.margins: 10; wrapMode: Text.Wrap;
+                                            font.pixelSize: 14;
+                                            color: isAuthorEnabled ? "#343a40" : "#adb5bd"
+                                            font.italic: !isAuthorEnabled
+                                            visible: !commentDelegate.isEditing
+                                        }
+
+                                        RowLayout {
+                                            id: editRow
+                                            anchors.fill: parent; anchors.margins: 10
+                                            visible: commentDelegate.isEditing
+
+                                            TextField {
+                                                id: editCommentField
+                                                Layout.fillWidth: true
+                                                background: Rectangle { color: "white"; border.color: "#ced4da"; radius: 4 }
+                                            }
+
+                                            Button {
+                                                text: "Zapisz"
+                                                background: Rectangle { color: "#28a745"; radius: 5 }
+                                                contentItem: Text { text: parent.text; color: "white"; font.bold: true }
+                                                onClicked: {
+                                                    if(editCommentField.text.trim() !== "") {
+                                                        updateCommentApi(game.title, index, editCommentField.text.trim());
+                                                        commentDelegate.isEditing = false;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -620,8 +718,11 @@ Rectangle {
                                         anchors.centerIn: parent
                                         spacing: 5
                                         Text { text: "🏢 " + dev.name + " (" + dev.country + ")"; font.pixelSize: 13; color: "#495057"; font.bold: true }
+
+                                        // Przycisk usunięcia widoczny tylko dla modów
                                         Rectangle {
                                             width: 16; height: 16; radius: 8; color: "#dc3545"
+                                            visible: root.isUserMod
                                             Text { text: "✖"; color: "white"; font.pixelSize: 10; font.bold: true; anchors.centerIn: parent }
                                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: deleteDeveloper(dev.name) }
                                         }
@@ -670,8 +771,11 @@ Rectangle {
                                         anchors.centerIn: parent
                                         spacing: 5
                                         Text { text: "🕹️ " + plat.name + " (" + plat.manufacturer + ")"; font.pixelSize: 13; color: "#495057"; font.bold: true }
+
+                                        // Przycisk usunięcia widoczny tylko dla modów
                                         Rectangle {
                                             width: 16; height: 16; radius: 8; color: "#dc3545"
+                                            visible: root.isUserMod
                                             Text { text: "✖"; color: "white"; font.pixelSize: 10; font.bold: true; anchors.centerIn: parent }
                                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: deletePlatform(plat.name) }
                                         }
@@ -789,6 +893,53 @@ Rectangle {
         }
     }
 
+    // ==========================================
+    // POP-UP EDYCJI GRY (TYLKO DLA MODÓW)
+    // ==========================================
+    Popup {
+        id: editPopup
+        width: 450
+        height: editLayout.implicitHeight + 50
+        anchors.centerIn: parent
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        Rectangle {
+            anchors.fill: parent; color: "white"; radius: 12; border.color: "#ced4da"; border.width: 1
+
+            ColumnLayout {
+                id: editLayout
+                anchors.fill: parent; anchors.margins: 25; spacing: 15
+
+                Label { text: "Edycja Gry: " + root.editingGameTitle; font.bold: true; font.pixelSize: 20; color: "#212529" }
+                Rectangle { Layout.fillWidth: true; height: 1; color: "#dee2e6"; Layout.bottomMargin: 10 }
+
+                TextField { id: editDev; placeholderText: "Deweloper"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: editYear; placeholderText: "Rok wydania"; validator: IntValidator {bottom: 1950; top: 2100} Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+                TextField { id: editGenre; placeholderText: "Gatunek"; Layout.fillWidth: true; background: Rectangle { color: "#f8f9fa"; border.color: "#ced4da"; radius: 4 } }
+
+                Label { id: editStatus; text: ""; color: "#dc3545"; font.bold: true }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight; Layout.topMargin: 10; spacing: 15
+                    Button {
+                        text: "Anuluj"
+                        background: Rectangle { color: "#e9ecef"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "#495057"; font.bold: true }
+                        onClicked: editPopup.close()
+                    }
+                    Button {
+                        text: "Zapisz Zmiany"
+                        background: Rectangle { color: "#0d6efd"; radius: 5 }
+                        contentItem: Text { text: parent.text; color: "white"; font.bold: true }
+                        onClicked: saveGameEdits()
+                    }
+                }
+            }
+        }
+    }
+
     Popup {
         id: deleteAccountPopup
         width: 320; height: 180; anchors.centerIn: parent; modal: true; focus: true; closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -796,12 +947,12 @@ Rectangle {
             anchors.fill: parent; color: "white"; radius: 10; border.color: "#dc3545"; border.width: 2
             ColumnLayout {
                 anchors.fill: parent; anchors.margins: 20; spacing: 15
-                Label { text: "Czy na pewno chcesz usunąć swoje konto?"; font.bold: true; font.pixelSize: 16; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
+                Label { text: "Czy na pewno chcesz zdezaktywować swoje konto?"; font.bold: true; font.pixelSize: 16; color: "#212529"; Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
                 Label { text: "Tej operacji nie można cofnąć."; color: "#dc3545"; font.bold: true; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter; spacing: 15
                     Button { text: "Anuluj"; background: Rectangle { color: "#e2e6ea"; radius: 5 } onClicked: deleteAccountPopup.close() }
-                    Button { text: "Tak, usuń"; background: Rectangle { color: "#dc3545"; radius: 5 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: deleteMyAccount() }
+                    Button { text: "Tak, dezaktywuj"; background: Rectangle { color: "#dc3545"; radius: 5 } contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter } onClicked: toggleAccountStatus() }
                 }
             }
         }
@@ -856,6 +1007,31 @@ Rectangle {
         fetchDevelopers();
         fetchPlatforms();
         fetchPremieres();
+    }
+
+    function saveGameEdits() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("PUT", "http://localhost:8080/api/games/" + encodeURIComponent(root.editingGameTitle));
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    editPopup.close();
+                    fetchGames();
+                } else {
+                    editStatus.text = "Błąd edycji: " + xhr.responseText;
+                }
+            }
+        }
+
+        var payload = {
+            "developer": editDev.text,
+            "release_year": parseInt(editYear.text),
+            "genre": editGenre.text
+        };
+        xhr.send(JSON.stringify(payload));
     }
 
     // --- FUNKCJE DLA PREMIER ---
@@ -974,13 +1150,24 @@ Rectangle {
                                 return {
                                     title: game.title,
                                     developer: game.developer,
-                                    platform: game.platform ? game.platform : "", // <-- Obsługa nowej właściwości w mapowaniu
+                                    platform: game.platform ? game.platform : "",
                                     release_year: game.release_year,
                                     genre: game.classification ? game.classification.genre : "Brak",
                                     theme: game.classification ? game.classification.theme : "Brak",
                                     difficulty: game.classification ? game.classification.difficulty : "Brak",
                                     engine: game.technical_stats ? game.technical_stats.engine : "Brak",
-                                    comments: game.comments ? game.comments : [],
+                                    average_playtime_hours: game.technical_stats ? game.technical_stats.average_playtime_hours : 0,
+
+                                    // Pamiętamy o wyszarzaniu zablokowanych userów
+                                    comments: game.comments ? game.comments.map(function(c) {
+                                        return {
+                                            author_name: c.author_name,
+                                            content: c.content,
+                                            date: c.date,
+                                            author_is_enabled: c.author_is_enabled !== undefined ? c.author_is_enabled : true
+                                        };
+                                    }) : [],
+
                                     image_url: game.image_url ? ("http://localhost:8080" + game.image_url + "?t=" + Date.now()) : "",
                                     rating_up: game.rating_up !== undefined ? game.rating_up : 0,
                                     rating_down: game.rating_down !== undefined ? game.rating_down : 0
@@ -1041,7 +1228,7 @@ Rectangle {
         var payload = {
             "title": inputTitle.text,
             "developer": inputDev.currentText,
-            "platform": inputPlatform.currentText, // <-- Nowe pole dodane do payloadu
+            "platform": inputPlatform.currentText,
             "release_year": inputYear.text !== "" ? parseInt(inputYear.text) : 2024,
             "classification": {
                 "genre": inputGenre.text || "Brak",
@@ -1073,18 +1260,46 @@ Rectangle {
         xhr.send(JSON.stringify({ "content": content }));
     }
 
-    function deleteMyAccount() {
+    function updateCommentApi(gameTitle, commentIndex, newContent) {
         var xhr = new XMLHttpRequest();
-        xhr.open("DELETE", "http://localhost:8080/api/users/" + encodeURIComponent(root.loggedUserEmail));
+        xhr.open("PATCH", "http://localhost:8080/api/games/" + encodeURIComponent(gameTitle) + "/comments/" + commentIndex);
+        xhr.setRequestHeader("Content-Type", "application/json");
         xhr.setRequestHeader("Authorization", root.authToken);
+
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200 || xhr.status === 204) { deleteAccountPopup.close(); stackView.pop(); }
-                else { console.error("Błąd usuwania konta:", xhr.responseText); }
+                if (xhr.status === 200) {
+                    console.log("Komentarz zaktualizowany pomyślnie.");
+                    fetchGames();
+                } else {
+                    console.error("Błąd edycji komentarza:", xhr.responseText);
+                }
             }
         };
+
+        xhr.send(JSON.stringify({ "content": newContent }));
+    }
+
+    function toggleAccountStatus() {
+        var xhr = new XMLHttpRequest();
+        var flagStr = false;
+
+        xhr.open("PATCH", "http://localhost:8080/api/users/" + encodeURIComponent(root.loggedUserEmail) + "/status/" + flagStr);
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    deleteAccountPopup.close();
+                    stackView.pop();
+                } else {
+                    console.error("Błąd podczas zmiany statusu konta:", xhr.responseText);
+                }
+            }
+        }
         xhr.send();
     }
+
 
     function sendRating(gameTitle, voteType) {
         var xhr = new XMLHttpRequest();
@@ -1203,5 +1418,27 @@ Rectangle {
         };
 
         xhr.send(JSON.stringify(payload));
+    }
+
+    // --- NOWE FUNKCJE (DLA MODA) ---
+    function deleteGame(title) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("DELETE", "http://localhost:8080/api/games/" + encodeURIComponent(title));
+        xhr.setRequestHeader("Authorization", root.authToken);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && (xhr.status === 200 || xhr.status === 204)) {
+                fetchGames();
+            }
+        }
+        xhr.send();
+    }
+
+    function openEditPopup(game) {
+        root.editingGameTitle = game.title;
+        editDev.text = game.developer;
+        editYear.text = game.release_year.toString();
+        editGenre.text = game.genre;
+        editStatus.text = "";
+        editPopup.open();
     }
 }

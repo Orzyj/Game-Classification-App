@@ -177,7 +177,7 @@ Rectangle {
                   adminTabs.currentIndex === 1 ? (root.usersList.length === 0 ? "Brak użytkowników." : "") :
                   adminTabs.currentIndex === 2 ? (root.logsList.length === 0 ? "Brak logów aktywności." : "") :
                   adminTabs.currentIndex === 3 ? (root.reportsList.length === 0 ? "Brak zgłoszonych ticketów." : "") :
-                  (root.premieresList.length === 0 ? "Brak zaplanowanych premier." : "") // <--- NOWE
+                  (root.premieresList.length === 0 ? "Brak zaplanowanych premier." : "")
             color: "#6c757d"
             font.italic: true
             font.bold: true
@@ -185,7 +185,7 @@ Rectangle {
                      (adminTabs.currentIndex === 1 && root.usersList.length === 0) ||
                      (adminTabs.currentIndex === 2 && root.logsList.length === 0) ||
                      (adminTabs.currentIndex === 3 && root.reportsList.length === 0) ||
-                     (adminTabs.currentIndex === 4 && root.premieresList.length === 0) // <--- NOWE
+                     (adminTabs.currentIndex === 4 && root.premieresList.length === 0)
             Layout.alignment: Qt.AlignHCenter
         }
 
@@ -304,7 +304,7 @@ Rectangle {
 
             delegate: Rectangle {
                 width: usersListView.width
-                height: 80
+                height: userLayout.implicitHeight + 30
                 color: "white"
                 radius: 12
                 border.color: "#ced4da"
@@ -314,10 +314,12 @@ Rectangle {
                 property var user: modelData
 
                 RowLayout {
+                    id: userLayout
                     anchors.fill: parent
                     anchors.margins: 15
 
                     Rectangle {
+                        Layout.alignment: Qt.AlignTop
                         width: 50; height: 50; radius: 25
                         color: "#e9ecef"
                         Label { text: "👤"; anchors.centerIn: parent; font.pixelSize: 24 }
@@ -329,32 +331,90 @@ Rectangle {
                         spacing: 4
 
                         Label {
-                            text: user.email ? user.email : "Brak email"
+                            text: user.name ? user.name : "Nieznana nazwa"
                             font.bold: true
                             font.pixelSize: 18
                             color: "#212529"
                         }
+
                         Label {
-                            text: "ID: " + (user._id ? user._id["$oid"] : "Brak")
-                            font.pixelSize: 13
-                            color: "#6c757d"
+                            text: "📧 Email: " + (user.email ? user.email : "Brak email")
+                            font.pixelSize: 14
+                            color: "#495057"
+                        }
+
+                        Label {
+                            text: "🔑 Hasło (hash): " + (user.password ? user.password : "Brak")
+                            font.pixelSize: 12
+                            color: "#adb5bd"
+                        }
+
+                        RowLayout {
+                            spacing: 15
+                            Layout.topMargin: 5
+
+                            Label {
+                                text: "👑 Rola: " + (user.isMod ? "Moderator" : "Zwykły użytkownik")
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: user.isMod ? "#d63384" : "#6c757d"
+                            }
+
+                            Label {
+                                text: "🟢 Status: " + (user.isEnable !== false ? "Konto aktywne" : "Zablokowane")
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: user.isEnable !== false ? "#198754" : "#dc3545"
+                            }
                         }
                     }
 
-                    Button {
-                        text: "🗑️ Usuń Użytkownika"
-                        background: Rectangle { color: "#f8d7da"; radius: 5; border.color: "#dc3545"; border.width: 1 }
-                        contentItem: Text { text: parent.text; color: "#dc3545"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        visible: user.email !== root.loggedUserEmail
-                        onClicked: deleteUser(user.email)
-                    }
+                    RowLayout {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                        spacing: 10
 
-                    Label {
-                        text: "(To Twoje konto)"
-                        color: "#198754"
-                        font.italic: true
-                        font.bold: true
-                        visible: user.email === root.loggedUserEmail
+                        // Przyciski Uprawnień (MOD)
+                        Button {
+                            text: "⬆️ Nadaj Moda"
+                            visible: user.isMod === false || user.isMod === undefined
+                            background: Rectangle { color: "#28a745"; radius: 5 }
+                            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: toggleModStatus(user.email, true)
+                        }
+
+                        Button {
+                            text: "⬇️ Odbierz Moda"
+                            visible: user.isMod === true
+                            background: Rectangle { color: "#ffc107"; radius: 5 }
+                            contentItem: Text { text: parent.text; color: "#212529"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: toggleModStatus(user.email, false)
+                        }
+
+                        // Przyciski Statusu Konta (ENABLE/DISABLE)
+                        Button {
+                            text: "✅ Odblokuj"
+                            visible: user.isEnable === false
+                            background: Rectangle { color: "#20c997"; radius: 5 }
+                            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: toggleAccountStatus(user.email, true)
+                        }
+
+                        Button {
+                            text: "🚫 Zablokuj"
+                            visible: user.isEnable !== false
+                            background: Rectangle { color: "#fd7e14"; radius: 5 }
+                            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: toggleAccountStatus(user.email, false)
+                        }
+
+                        // Przycisk Usuwania
+                        Button {
+                            text: "🗑️ Usuń"
+                            enabled: false
+                            background: Rectangle { color: "#f8d7da"; radius: 5; border.color: "#dc3545"; border.width: 1 }
+                            contentItem: Text { text: parent.text; color: "#dc3545"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            onClicked: deleteUser(user.email)
+                        }
                     }
                 }
             }
@@ -500,7 +560,6 @@ Rectangle {
                     }
 
                     Label {
-                        // Uwaga: Zmień ticketEntry.message na nazwę pola z backendu (np. ticketEntry.content), jeśli jest inna.
                         text: "📝 Treść: " + (ticketEntry.message ? ticketEntry.message : (ticketEntry.content ? ticketEntry.content : "Brak treści zgłoszenia."))
                         font.pixelSize: 14
                         color: "#343a40"
@@ -727,6 +786,55 @@ Rectangle {
         fetchPremieres()
     }
 
+    // ==========================================
+    // FUNKCJE UŻYTKOWNIKÓW (UPRAWNIENIA / STATUS)
+    // ==========================================
+
+    function toggleModStatus(email, flag) {
+        var xhr = new XMLHttpRequest();
+        var flagStr = flag ? "true" : "false";
+
+        xhr.open("PATCH", "http://localhost:8080/api/users/" + encodeURIComponent(email) + "/" + flagStr);
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    console.log("Pomyślnie zmieniono uprawnienia użytkownika: " + email);
+                    fetchUsers(); // Odświeżamy listę, by zobaczyć efekty
+                } else {
+                    console.error("Błąd podczas zmiany uprawnień:", xhr.responseText);
+                }
+            }
+        }
+        xhr.send();
+    }
+
+    function toggleAccountStatus(email, flag) {
+        var xhr = new XMLHttpRequest();
+        var flagStr = flag ? "true" : "false";
+
+        // Strzał do nowo dodanego endpointu: /api/users/:email/status/:flag
+        xhr.open("PATCH", "http://localhost:8080/api/users/" + encodeURIComponent(email) + "/status/" + flagStr);
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    console.log("Pomyślnie zmieniono status konta: " + email);
+                    fetchUsers(); // Odświeżamy listę
+                } else {
+                    console.error("Błąd podczas zmiany statusu konta:", xhr.responseText);
+                }
+            }
+        }
+        xhr.send();
+    }
+
+    // ==========================================
+    // FUNKCJE API: PREMIERY
+    // ==========================================
+
     function fetchPremieres() {
         var xhr = new XMLHttpRequest();
         xhr.open("GET", "http://localhost:8080/api/premiers");
@@ -744,10 +852,6 @@ Rectangle {
         }
         xhr.send();
     }
-
-    // ==========================================
-    // FUNKCJE API: PREMIERY
-    // ==========================================
 
     function submitPremiere() {
         var xhr = new XMLHttpRequest();
@@ -900,7 +1004,13 @@ Rectangle {
                 try {
                     var jsonResponse = JSON.parse(xhr.responseText);
                     if (jsonResponse.status === "ok" && jsonResponse.users) {
-                        root.usersList = jsonResponse.users;
+
+                        // TUTAJ FILTRUJEMY - Usuwamy Twoje (zalogowane) konto z listy
+                        var filteredUsers = jsonResponse.users.filter(function(u) {
+                            return u.email !== root.loggedUserEmail;
+                        });
+
+                        root.usersList = filteredUsers;
                     }
                 } catch(e) { console.error("Błąd parsowania użytkowników:", e); }
             }
