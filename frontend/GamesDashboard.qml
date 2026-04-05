@@ -1219,7 +1219,8 @@ Rectangle {
                     inputEngine.text = ""; inputPlaytime.text = ""; inputDifficulty.currentIndex = 1;
                     fetchGames();
                 } else {
-                    addStatusLabel.text = "Błąd: " + xhr.responseText;
+                    var parsedData = JSON.parse(xhr.responseText);
+                    addStatusLabel.text = "Błąd: " + parsedData.error;
                     addStatusLabel.color = "#dc3545";
                 }
             }
