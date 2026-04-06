@@ -617,6 +617,13 @@ Rectangle {
                                                 }
                                             }
                                         }
+
+                                        Button {
+                                            text: "❌ Usuń"
+                                            background: Rectangle { color: "transparent"; radius: 5 }
+                                            contentItem: Text { text: parent.text; color: "#dc3545"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                            onClicked: deleteComment(game.title, index)
+                                        }
                                     }
 
                                     Rectangle {
@@ -1442,4 +1449,18 @@ Rectangle {
         editStatus.text = "";
         editPopup.open();
     }
+
+    function deleteComment(gameTitle, commentIndex) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("DELETE", "http://localhost:8080/api/games/" + encodeURIComponent(gameTitle) + "/comments/" + commentIndex);
+        xhr.setRequestHeader("Authorization", root.authToken);
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && (xhr.status === 200 || xhr.status === 204)) {
+                fetchGames();
+            }
+        }
+        xhr.send();
+    }
+
 }
