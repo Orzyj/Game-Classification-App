@@ -13,6 +13,9 @@ A compact client-server application for managing and rating video games. The pro
 <p align="center">
   <img src="img/3.png" alt="admin view">
 </p>
+<p align="center">
+  <img src="img/4.png" alt="admin view">
+</p>
 
 ## Technologies
 
