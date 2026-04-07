@@ -25,7 +25,7 @@ A compact client-server application for managing and rating video games. The pro
 
 ## Key Features
 
-* **Authentication & Roles:** Separate dashboards for Administrators and regular Users.
+* **Authentication & Roles:** Separate dashboards for Administrators, regular Users and moderator.
 * **Game Database:** Browsing, searching, and filtering games by genre, title and theme.
 * **Rating System:** Upvoting and downvoting games, securely protected against multiple votes from the same user.
 * **Media:** Support for uploading and displaying cover images (server-side file upload).
