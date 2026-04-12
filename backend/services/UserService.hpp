@@ -24,13 +24,7 @@ private:
      * @brief Generuje aktualny znacznik czasu w czytelnym formacie.
      * @return std::string Aktualna data i czas (np. "2024-05-18 14:30:00").
      */
-    std::string getCurrentTimestamp() const {
-        auto now = std::chrono::system_clock::now();
-        auto in_time_t = std::chrono::system_clock::to_time_t(now);
-        std::stringstream ss;
-        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X");
-        return ss.str();
-    }
+    std::string getCurrentTimestamp() const;
 
 public:
     /**
@@ -38,8 +32,7 @@ public:
      * @param auditRepo Referencja do repozytorium logów audytowych.
      * @param userRepo Referencja do repozytorium użytkowników.
      */
-    explicit UserService(IAuditRepository& auditRepo, IUserRepository& userRepo) 
-        : auditRepository(auditRepo), userRepository(userRepo) {}
+    explicit UserService(IAuditRepository& auditRepo, IUserRepository& userRepo);
 
     /**
      * @brief Rejestruje nowego użytkownika w systemie.
@@ -48,17 +41,7 @@ public:
      * * @param user Obiekt encji User zawierający dane rejestracyjne.
      * @throws std::invalid_argument Jeśli użytkownik o podanym adresie email już istnieje.
      */
-    void registerUser(const User& user) {
-        if (userRepository.userExists(user.email)) {
-            throw std::invalid_argument("Użytkownik o podanym adresie email już istnieje!");
-        }
-
-        userRepository.insertUser(user);
-
-        const std::string DETAILS = "Utworzenie użytkownika: " + user.email;
-        AuditLog newLog(getCurrentTimestamp(), user.email, "USER_REGISTER", DETAILS);
-        auditRepository.insertLog(newLog);
-    }
+    void registerUser(const User& user);
 
     /**
      * @brief Weryfikuje dane logowania użytkownika.
@@ -68,24 +51,13 @@ public:
      * @param password Hasło użytkownika.
      * @return true, jeśli dane logowania są poprawne, false w przeciwnym razie.
      */
-    bool loginUser(const std::string& email, const std::string& password) {
-        bool isValid = userRepository.validateCredentials(email, password);
-        std::string action = isValid ? "USER_LOGIN" : "FAILED_LOGIN";
-        std::string details = isValid ? "Pomyślne logowanie użytkownika" : "Próba logowania z błędnym hasłem";
-
-        AuditLog newLog(getCurrentTimestamp(), email, action, details);
-        auditRepository.insertLog(newLog);
-
-        return isValid;
-    }
+    bool loginUser(const std::string& email, const std::string& password);
 
     /**
      * @brief Pobiera listę wszystkich użytkowników w systemie.
      * @return std::vector<User> Wektor zawierający dane użytkowników.
      */
-    std::vector<User> getAllUsers() {
-        return userRepository.getAllUsers();
-    }
+    std::vector<User> getAllUsers();
 
     /**
      * @brief Usuwa konto użytkownika.
@@ -93,15 +65,7 @@ public:
      * * @param email Adres email konta przeznaczonego do usunięcia.
      * @return true, jeśli konto zostało pomyślnie usunięte, false jeśli go nie znaleziono.
      */
-    bool deleteUser(const std::string& email) {
-        bool isDeleted = userRepository.deleteUser(email);
-        if (isDeleted) {
-            AuditLog newLog(getCurrentTimestamp(), email, "USER_DELETED", "Usunięto konto użytkownika");
-            auditRepository.insertLog(newLog);
-        }
-
-        return isDeleted;
-    }
+    bool deleteUser(const std::string& email);
 
     /**
      * @brief Zmienia uprawnienia moderatora/administratora dla danego konta.
@@ -109,17 +73,7 @@ public:
      * @param flag true, aby nadać uprawnienia, false, aby je odebrać.
      * @return true, jeśli konto zostało pomyślnie zmodyfikowane, false jeśli wystąpił błąd.
      */
-    bool modUser(const std::string& email, const bool& flag) {
-        bool isModed = userRepository.modUser(email, flag);
-
-        if(isModed) {
-            std::string logMessage = flag ? "Nadano uprawnienia moderatora" : "Odebrano uprawnienia moderatora";
-            AuditLog newLog(getCurrentTimestamp(), email, "MOD_USER", logMessage);
-            auditRepository.insertLog(newLog);
-        }
-
-        return isModed;
-    }
+    bool modUser(const std::string& email, const bool& flag);
 
     /**
      * @brief Zmienia status aktywności konta użytkownika (aktywacja/dezaktywacja).
@@ -130,35 +84,21 @@ public:
      * @param flag Wartość logiczna: true, aby aktywować (odblokować) konto, false, aby je dezaktywować (zablokować).
      * @return true, jeśli status został pomyślnie zmieniony, false jeśli wystąpił błąd (np. brak użytkownika w bazie).
      */
-    bool changeUserAccountStatus(const std::string& email, const bool& flag) {
-        bool isChanged = userRepository.chagneUserAccountStatus(email, flag);
-
-        if(isChanged) {
-            std::string logMessage = flag ? "Aktywowano użytkownika" : "Dezaktywowano";
-            AuditLog newLog(getCurrentTimestamp(), email, "ACCOUNT_STATUS_USER", logMessage);
-            auditRepository.insertLog(newLog);
-        }
-
-        return isChanged;
-    }
+    bool changeUserAccountStatus(const std::string& email, const bool& flag);
 
     /**
      * @brief Sprawdza, czy użytkownik o podanym adresie email posiada uprawnienia moderatora.
      * @param email Adres email użytkownika do sprawdzenia.
      * @return true, jeśli użytkownik ma uprawnienia moderatora, false w przeciwnym razie (lub gdy użytkownik nie istnieje).
      */
-    bool isUserMod(const std::string& email) {
-        return userRepository.isUserMod(email);
-    }
+    bool isUserMod(const std::string& email);
 
     /**
      * @brief Sprawdza, czy konto użytkownika o podanym adresie email jest aktywne.
      * @param email Adres email użytkownika do sprawdzenia.
      * @return true, jeśli konto jest aktywne (niezablokowane), false jeśli jest zablokowane (lub gdy użytkownik nie istnieje).
      */
-    bool isUserEnable(const std::string& email) {
-        return userRepository.isUserEnable(email);
-    }
+    bool isUserEnable(const std::string& email);
 };
 
 #endif // USERSERVICE_HPP

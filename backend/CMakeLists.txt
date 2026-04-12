@@ -13,7 +13,27 @@ find_package(httplib CONFIG REQUIRED)
 
 # Definicja pliku wykonywalnego
 add_executable(my_backend 
-    src/main.cpp)
+
+    controllers/AuditController.cpp
+    controllers/CatalogController.cpp
+    controllers/GameController.cpp
+    controllers/ReportController.cpp
+    controllers/UserController.cpp
+
+    repositories/MongoAuditRepository.cpp
+    repositories/MongoCatalogRepository.cpp
+    repositories/MongoReportsRepository.cpp
+    repositories/MongoUserRepository.cpp
+    repositories/MongoGameRepository.cpp
+
+    services/AuditService.cpp
+    services/CatalogService.cpp
+    services/GameService.cpp
+    services/ReportService.cpp
+    services/UserService.cpp
+
+    src/main.cpp
+)
 
 target_include_directories(my_backend PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include 

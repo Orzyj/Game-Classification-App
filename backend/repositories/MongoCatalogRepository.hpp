@@ -19,130 +19,32 @@ private:
 
 public:
     // Wstrzykiwanie połączenia do bazy (DI)
-    explicit MongoCatalogRepository(mongocxx::database database) : db(std::move(database)) {}
+    explicit MongoCatalogRepository(mongocxx::database database);
 
     // ==========================================
     // DEWELOPERZY
     // ==========================================
-    bool insertDeveloper(const Developer& dev) override {
-        try {
-            auto collection = db["developers"];
-            nlohmann::json j = dev;
-            auto doc = bsoncxx::from_json(j.dump());
-            auto result = collection.insert_one(doc.view());
-            return result ? true : false;
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd dodawania dewelopera: " << e.what() << std::endl;
-            return false;
-        }
-    }
+    bool insertDeveloper(const Developer& dev);
 
-    std::vector<Developer> getAllDevelopers() override {
-        std::vector<Developer> devs;
-        try {
-            auto collection = db["developers"];
-            auto cursor = collection.find({});
-            for (auto&& doc : cursor) {
-                auto j = nlohmann::json::parse(bsoncxx::to_json(doc));
-                devs.push_back(j.get<Developer>()); // Magia nlohmann_json
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd odczytu deweloperów: " << e.what() << std::endl;
-        }
-        return devs;
-    }
+    std::vector<Developer> getAllDevelopers() override;
 
-    bool deleteDeveloper(const std::string& name) override {
-        try {
-            auto collection = db["developers"];
-            auto filter = make_document(kvp("name", name));
-            auto result = collection.delete_one(filter.view());
-            return (result && result->deleted_count() > 0);
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd usuwania dewelopera: " << e.what() << std::endl;
-            return false;
-        }
-    }
+    bool deleteDeveloper(const std::string& name) override;
 
     // ==========================================
     // PLATFORMY
     // ==========================================
-    bool insertPlatform(const Platform& platform) override {
-        try {
-            auto collection = db["platforms"];
-            nlohmann::json j = platform;
-            auto doc = bsoncxx::from_json(j.dump());
-            auto result = collection.insert_one(doc.view());
-            return result ? true : false;
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd dodawania platformy: " << e.what() << std::endl;
-            return false;
-        }
-    }
+    bool insertPlatform(const Platform& platform) override;
 
-    std::vector<Platform> getAllPlatforms() override {
-        std::vector<Platform> platforms;
-        try {
-            auto collection = db["platforms"];
-            auto cursor = collection.find({});
-            for (auto&& doc : cursor) {
-                auto j = nlohmann::json::parse(bsoncxx::to_json(doc));
-                platforms.push_back(j.get<Platform>());
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd odczytu platform: " << e.what() << std::endl;
-        }
-        return platforms;
-    }
+    std::vector<Platform> getAllPlatforms() override;
 
-    bool deletePlatform(const std::string& name) override {
-        try {
-            auto collection = db["platforms"];
-            auto filter = make_document(kvp("name", name));
-            auto result = collection.delete_one(filter.view());
-            return (result && result->deleted_count() > 0);
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd usuwania platformy: " << e.what() << std::endl;
-            return false;
-        }
-    }
+    bool deletePlatform(const std::string& name) override;
 
     // ==========================================
     // PREMIERY
     // ==========================================
-    bool insertPremiere(const GamePremier& premiere) override {
-        try {
-            // Uwaga: w Twoim starym kodzie kolekcja nazywała się "premiers"
-            auto collection = db["premiers"]; 
-            nlohmann::json j = premiere;
-            auto doc = bsoncxx::from_json(j.dump());
-            auto result = collection.insert_one(doc.view());
-            return result ? true : false;
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd dodawania premiery: " << e.what() << std::endl;
-            return false;
-        }
-    }
+    bool insertPremiere(const GamePremier& premiere) override;
 
-    std::vector<GamePremier> getAllPremieres() override {
-        std::vector<GamePremier> premieres;
-        try {
-            auto collection = db["premiers"];
-            
-            // Zachowanie Twojej logiki sortowania po dacie!
-            mongocxx::options::find opts{};
-            opts.sort(make_document(kvp("release_date", 1)));
-
-            auto cursor = collection.find({}, opts);
-            for (auto&& doc : cursor) {
-                auto j = nlohmann::json::parse(bsoncxx::to_json(doc));
-                premieres.push_back(j.get<GamePremier>());
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[MongoCatalog] Błąd odczytu premier: " << e.what() << std::endl;
-        }
-        return premieres;
-    }
+    std::vector<GamePremier> getAllPremieres() override;
 };
 
 #endif // MONGOCATALOGREPOSITORY_HPP

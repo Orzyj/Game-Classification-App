@@ -71,7 +71,11 @@ int main() {
     httplib::Server svr;
     svr.set_mount_point("/uploads", "./uploads");
 
-    //[DP] MIDDLEWARE AUTORYZACYJNY
+    /**
+     * @brief [DP] MIDDLEWARE AUTORYZACYJNY
+     * @param std::function<const httplib::Request& req, httplib::Response& res> callback
+     * @return none
+     */
     auto with_auth = [](auto handler) {
         return [handler](const httplib::Request& req, httplib::Response& res) {
             if (!req.has_header("Authorization")) {
