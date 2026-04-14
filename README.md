@@ -22,6 +22,7 @@ A compact client-server application for managing and rating video games. The pro
 * **Backend:** C++ (`cpp-httplib`, `nlohmann/json`), MongoDB (`mongo-cxx-driver`)
 * **Frontend:** Qt 6 (QML, native C++ plugins for file uploads)
 * **Infrastructure:** Docker & Docker Compose
+* **MicroServices**
 
 ## Key Features
 
