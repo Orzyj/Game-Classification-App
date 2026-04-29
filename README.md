@@ -1,4 +1,4 @@
-# Game Catalog
+# Game Catalog [Academic Project]
 
 A compact client-server application for managing and rating video games. The project combines a fast C++ backend server with a modern, responsive user interface built in Qt/QML.
 
